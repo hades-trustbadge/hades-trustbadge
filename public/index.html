@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Newsletter Studio</title>
+  <style>
+    :root{--bg:#f3f4f6;--panel:#ffffff;--muted:#6b7280;--text:#111827;--brand:#1f3cff;--border:#e5e7eb;--soft:#f9fafb;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:1400px;margin:auto;padding:12px}
+    .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:8px 0 16px}
+    h1{font-size:20px;margin:0 0 4px}
+    .sub{color:var(--muted);font-size:12px}
+    .btn{cursor:pointer;border:1px solid var(--border);background:#fff;border-radius:8px;padding:10px 14px;font-weight:600;font-size:13px;transition:all .2s}
+    .btn:hover:not(:disabled){background:var(--soft);border-color:var(--brand);transform:translateY(-1px)}
+    .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .btn.primary:hover:not(:disabled){background:#1530e6;opacity:.95}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:1024px){.grid{grid-template-columns:280px 1fr}}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+    .card-h{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--soft)}
+    .card-b{padding:14px}
+    label{font-weight:700;font-size:13px;display:block;margin:0 0 6px;color:var(--text)}
+    input[type=text],textarea,select{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font:inherit;resize:vertical}
+    input[type=text]:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(31,60,255,.1)}
+    textarea{min-height:200px;font-family:'Monaco','Courier New',monospace;font-size:12px}
+    .list{max-height:65vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--soft)}
+    .item{padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:all .15s}
+    .item:last-child{border-bottom:0}
+    .item:hover{background:#fff}
+    .item.active{background:#fff;border-left:4px solid var(--brand);padding-left:8px;font-weight:600}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .row-right{margin-left:auto;display:flex;gap:6px}
+    .muted{color:var(--muted);font-size:12px}
+    .small{font-size:12px}
+    .pill{display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:#eef2ff;font-size:11px;color:var(--brand);font-weight:600}
+    .kbd{font-family:monospace;padding:1px 5px;border:1px solid var(--border);border-radius:4px;background:var(--soft);font-size:11px}
+    .warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:10px;border-radius:8px;font-size:12px}
+    .ok{background:#ecfeff;border:1px solid #a5f3fc;color:#155e75;padding:10px;border-radius:8px;font-size:12px}
+    .error{background:#fee2e2;border:1px solid #fecaca;color:#991b1b;padding:10px;border-radius:8px;font-size:12px}
+    iframe{width:100%;height:600px;border:1px solid var(--border);border-radius:10px;background:#fff}
+    .split{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:768px){.split{grid-template-columns:1fr 1fr}}
+    .hr{height:1px;background:var(--border);margin:12px 0}
+    a{color:var(--brand)}
+    .ai-output{min-height:60px;padding:12px;background:var(--soft);border-radius:8px;border:1px solid var(--border);font-size:12px;white-space:pre-wrap;word-wrap:break-word;display:none}
+    .ai-output.show{display:block}
+    .ai-output.loading{background:#eef2ff;border-color:#c7d2fe;color:#312e81}
+    .checkbox-row{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .checkbox-row input[type=checkbox]{cursor:pointer;width:16px;height:16px}
+    .checkbox-row label{margin:0;font-weight:500;cursor:pointer}
+    .title-item{font-weight:700;margin-bottom:4px;color:var(--text)}
+    .date-item{color:var(--muted);font-size:11px}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <div class="bar">
+      <div>
+        <h1>📰 Newsletter Studio</h1>
+        <div class="sub">Crie, edite e converta newsletters em HTML renderizado</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btn-new">➕ Novo</button>
+        <button class="btn primary" id="btn-save">💾 Salvar</button>
+        <button class="btn" id="btn-download">⬇️ Download</button>
+        <button class="btn" id="btn-export">📤 Exportar</button>
+        <button class="btn" id="btn-import">📥 Importar</button>
+        <input id="file-import" type="file" accept="application/json" style="display:none" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <aside class="card">
+        <div class="card-h"><strong>🗂️ Suas Newsletters</strong></div>
+        <div class="card-b">
+          <label for="filter">Filtrar</label>
+          <input id="filter" type="text" placeholder="Buscar por título..." />
+          <div class="list" id="list"></div>
+        </div>
+
+        <div class="card-h" style="margin-top:12px"><strong>🤖 OpenAI</strong> <span class="pill">Backend Seguro</span></div>
+        <div class="card-b">
+          <div class="ok">Configure sua chave em <code>.env</code> e utilize os botões para testar a IA. O modelo usado é <strong>gpt-4o-mini</strong>.</div>
+          <div class="hr"></div>
+          <div class="row" style="margin-top:12px;gap:6px">
+            <button class="btn" id="btn-ai-text" style="flex:1">📝 Texto → HTML</button>
+            <button class="btn" id="btn-ai-improve" style="flex:1">✨ Melhorar</button>
+          </div>
+          <div id="ai-out" class="ai-output"></div>
+        </div>
+      </aside>
+
+      <section class="split">
+        <div class="card">
+          <div class="card-h">
+            <strong>📝 Editor</strong>
+            <div class="row-right">
+              <button class="btn" id="btn-dup">📋 Dup</button>
+              <button class="btn" id="btn-del">🗑️ Del</button>
+            </div>
+          </div>
+          <div class="card-b">
+            <label for="title">Título</label>
+            <input id="title" type="text" placeholder="Ex: Black Friday 2024" />
+            <label for="html" style="margin-top:12px">HTML ou Texto</label>
+            <textarea id="html" placeholder="Cole HTML completo, ou texto para converter com IA..."></textarea>
+            <div class="muted small" style="margin-top:8px">💡 Cole HTML com &lt;html&gt; ou só o conteúdo. A IA pode converter texto em HTML!</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">
+            <strong>👁️ Preview Renderizado</strong>
+            <span class="muted small">(ao vivo)</span>
+          </div>
+          <div class="card-b" style="padding:0">
+            <iframe id="preview" title="Preview"></iframe>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const $ = id => document.getElementById(id);
+      const DB = { items: 'ns.items.v1', draft: 'ns.draft.v1' };
+      let state = { items: [], draft: { title: '', html: '' }, selectedId: null };
+
+      function now() { return new Date().toISOString(); }
+      function sanitize(s) {
+        return (s + '').replace(/[&<>"']/g, c => {
+          switch (c) {
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            case "'": return '&#39;';
+            default: return c;
+          }
+        });
+      }
+
+      function download(name, content, type = 'text/plain;charset=utf-8') {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function safeName(n) {
+        const base = (n || 'newsletter') + '';
+        const safe = base.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        return (safe || 'newsletter') + '.html';
+      }
+
+      function loadAll() {
+        try { state.items = JSON.parse(localStorage.getItem(DB.items)) || []; } catch { state.items = []; }
+        try { state.draft = JSON.parse(localStorage.getItem(DB.draft)) || { title: '', html: '' }; } catch { state.draft = { title: '', html: '' }; }
+      }
+
+      function saveState() {
+        localStorage.setItem(DB.items, JSON.stringify(state.items));
+        localStorage.setItem(DB.draft, JSON.stringify(state.draft));
+      }
+
+      function showList() {
+        const q = ($('#filter').value || '').toLowerCase().trim();
+        const box = $('#list');
+        box.innerHTML = '';
+
+        const sorted = [...state.items].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        const filtered = sorted.filter(i => !q || (i.title || '').toLowerCase().includes(q));
+
+        if (filtered.length === 0) {
+          box.innerHTML = '<div class="muted" style="padding:16px;text-align:center">Nenhuma newsletter ainda</div>';
+          return;
+        }
+
+        filtered.forEach(item => {
+          const li = document.createElement('div');
+          li.className = 'item' + (item.id === state.selectedId ? ' active' : '');
+          const dt = new Date(item.updatedAt);
+          const dateStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          li.innerHTML = `<div class="title-item">${sanitize(item.title || 'Sem título')}</div><div class="date-item">${dateStr}</div>`;
+          li.addEventListener('click', () => selectItem(item.id));
+          box.appendChild(li);
+        });
+      }
+
+      function selectItem(id) {
+        const item = state.items.find(x => x.id === id);
+        if (item) {
+          state.selectedId = id;
+          state.draft = { title: item.title, html: item.html };
+          loadForm();
+          saveState();
+          showList();
+          renderPreview();
+        }
+      }
+
+      function loadForm() {
+        $('#title').value = state.draft.title || '';
+        $('#html').value = state.draft.html || '';
+      }
+
+      $('#title').addEventListener('input', e => {
+        state.draft.title = e.target.value;
+        saveState();
+      });
+
+      $('#html').addEventListener('input', e => {
+        state.draft.html = e.target.value;
+        saveState();
+        renderPreview();
+      });
+
+      function renderPreview() {
+        const content = (state.draft.html || '').trim();
+
+        if (!content) {
+          $('#preview').srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Preview</title></head><body style="display:flex;align-items:center;justify-content:center;height:100vh;color:#999;font-family:system-ui"><p>Cole HTML para visualizar...</p></body></html>`;
+          return;
+        }
+
+        const hasFullDoc = /<html[\s\S]*?>[\s\S]*<\/html>/i.test(content);
+        let html;
+
+        if (hasFullDoc) {
+          html = content;
+        } else {
+          html = `<!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${sanitize(state.draft.title || 'Newsletter')}</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+      img { max-width: 100%; height: auto; }
+      table { border-collapse: collapse; width: 100%; }
+      td, th { padding: 10px; border: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+  ${content}
+  </body>
+  </html>`;
+        }
+
+        $('#preview').srcdoc = html;
+      }
+
+      function newDoc() {
+        state.selectedId = null;
+        state.draft = { title: '', html: '' };
+        loadForm();
+        saveState();
+        showList();
+        renderPreview();
+        $('#title').focus();
+      }
+
+      function saveDoc() {
+        const title = (state.draft.title || 'Sem título').trim();
+        const html = state.draft.html || '';
+        const ts = now();
+
+        if (!state.selectedId) {
+          const id = Math.random().toString(36).slice(2);
+          state.items.push({ id, title, html, createdAt: ts, updatedAt: ts });
+          state.selectedId = id;
+        } else {
+          const item = state.items.find(x => x.id === state.selectedId);
+          if (item) {
+            item.title = title;
+            item.html = html;
+            item.updatedAt = ts;
+          }
+        }
+
+        saveState();
+        showList();
+        alert('✅ Newsletter salva!');
+      }
+
+      function deleteDoc() {
+        if (!state.selectedId) {
+          alert('Selecione uma newsletter para deletar');
+          return;
+        }
+        if (confirm('Tem certeza que quer deletar?')) {
+          state.items = state.items.filter(i => i.id !== state.selectedId);
+          state.selectedId = null;
+          newDoc();
+        }
+      }
+
+      function duplicateDoc() {
+        if (!state.selectedId) {
+          alert('Selecione uma newsletter para duplicar');
+          return;
+        }
+        const src = state.items.find(i => i.id === state.selectedId);
+        if (!src) return;
+        const ts = now();
+        const copy = {
+          id: Math.random().toString(36).slice(2),
+          title: src.title + ' (cópia)',
+          html: src.html,
+          createdAt: ts,
+          updatedAt: ts
+        };
+        state.items.push(copy);
+        selectItem(copy.id);
+      }
+
+      function downloadDoc() {
+        if (!state.draft.html) {
+          alert('Nada para baixar! Cole um HTML primeiro.');
+          return;
+        }
+        const name = safeName(state.draft.title);
+        const content = $('#preview').srcdoc;
+        download(name, content, 'text/html;charset=utf-8');
+      }
+
+      function exportAll() {
+        if (state.items.length === 0) {
+          alert('Nenhuma newsletter para exportar');
+          return;
+        }
+        const payload = { version: 1, exportedAt: now(), items: state.items };
+        download(`newsletter-backup-${now().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), 'application/json');
+      }
+
+      function importFromJSON(file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (!Array.isArray(data.items)) throw new Error('Formato inválido');
+            const existingIds = new Set(state.items.map(i => i.id));
+            const newItems = data.items.filter(i => !existingIds.has(i.id));
+            state.items.push(...newItems);
+            state.selectedId = null;
+            saveState();
+            showList();
+            newDoc();
+            alert(`✅ Importado ${newItems.length} novo(s) item(ns)!`);
+          } catch (err) {
+            alert('❌ Erro ao importar: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      function showAIOutput(text, type = 'ok') {
+        const el = $('#ai-out');
+        el.textContent = text;
+        el.className = `ai-output show ${type === 'loading' ? 'loading' : type === 'ok' ? 'ok' : 'error'}`;
+      }
+
+      async function callAI(mode, content) {
+        const response = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, content })
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: 'Erro inesperado' }));
+          throw new Error(err.error || 'Falha ao comunicar com o servidor.');
+        }
+
+        const data = await response.json();
+        return data.html;
+      }
+
+      async function handleAIClick(button, mode, successMessage) {
+        const content = $('#html').value.trim();
+        if (!content) {
+          alert(`Cole um ${mode === 'text' ? 'texto' : 'HTML'} para a IA trabalhar.`);
+          return;
+        }
+
+        button.disabled = true;
+        showAIOutput('Processando com a IA...', 'loading');
+
+        try {
+          const result = await callAI(mode, content);
+          $('#html').value = result;
+          state.draft.html = result;
+          saveState();
+          renderPreview();
+          showAIOutput(successMessage, 'ok');
+        } catch (err) {
+          showAIOutput('❌ ' + err.message, 'error');
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      $('#btn-new').addEventListener('click', newDoc);
+      $('#btn-save').addEventListener('click', saveDoc);
+      $('#btn-del').addEventListener('click', deleteDoc);
+      $('#btn-dup').addEventListener('click', duplicateDoc);
+      $('#btn-download').addEventListener('click', downloadDoc);
+      $('#btn-export').addEventListener('click', exportAll);
+      $('#btn-import').addEventListener('click', () => $('#file-import').click());
+      $('#file-import').addEventListener('change', e => {
+        if (e.target.files[0]) importFromJSON(e.target.files[0]);
+        e.target.value = '';
+      });
+      $('#filter').addEventListener('input', showList);
+
+      $('#btn-ai-text').addEventListener('click', e => handleAIClick(e.target, 'text', '✅ HTML gerado! Confira o preview →'));
+      $('#btn-ai-improve').addEventListener('click', e => handleAIClick(e.target, 'html', '✅ HTML melhorado! Confira o preview →'));
+
+      document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveDoc(); }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); newDoc(); }
+      });
+
+      loadAll();
+      loadForm();
+      showList();
+      renderPreview();
+    });
+  </script>
+</body>
+</html>
