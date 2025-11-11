@@ -368,16 +368,89 @@
         el.className = `ai-output show ${type === 'loading' ? 'loading' : type === 'ok' ? 'ok' : 'error'}`;
       }
 
+      const TOKEN_STORAGE_KEY = 'newsletter-ai-proxy-token';
+
+      const tokenStore = (() => {
+        try {
+          const { sessionStorage } = window;
+          const testKey = '__token_test__';
+          sessionStorage.setItem(testKey, '1');
+          sessionStorage.removeItem(testKey);
+          return sessionStorage;
+        } catch (err) {
+          return null;
+        }
+      })();
+
+      let memoryToken = null;
+
+      try {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+      } catch (err) {
+        /* noop */
+      }
+
+      function getStoredToken() {
+        if (memoryToken) {
+          return memoryToken;
+        }
+
+        if (tokenStore) {
+          const stored = tokenStore.getItem(TOKEN_STORAGE_KEY);
+          if (stored && stored.trim()) {
+            memoryToken = stored.trim();
+            return memoryToken;
+          }
+        }
+
+        return null;
+      }
+
+      function promptForToken() {
+        const provided = prompt('Informe o token de acesso da IA:', '');
+        if (provided && provided.trim()) {
+          memoryToken = provided.trim();
+          if (tokenStore) {
+            tokenStore.setItem(TOKEN_STORAGE_KEY, memoryToken);
+          }
+          return memoryToken;
+        }
+
+        return null;
+      }
+
+      function getProxyToken() {
+        return getStoredToken() || promptForToken();
+      }
+
+      function clearProxyToken() {
+        memoryToken = null;
+        if (tokenStore) {
+          tokenStore.removeItem(TOKEN_STORAGE_KEY);
+        }
+      }
+
       async function callAI(mode, content) {
+        const token = getProxyToken();
+
+        if (!token) {
+          throw new Error('Token de acesso não informado.');
+        }
+
         const response = await fetch('/api/ai', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
           body: JSON.stringify({ mode, content })
         });
 
         if (!response.ok) {
           const err = await response.json().catch(() => ({ error: 'Erro inesperado' }));
-          throw new Error(err.error || 'Falha ao comunicar com o servidor.');
+          const error = new Error(err.error || 'Falha ao comunicar com o servidor.');
+          error.status = response.status;
+          throw error;
         }
 
         const data = await response.json();
@@ -402,6 +475,9 @@
           renderPreview();
           showAIOutput(successMessage, 'ok');
         } catch (err) {
+          if (err && (err.status === 401 || err.status === 403)) {
+            clearProxyToken();
+          }
           showAIOutput('❌ ' + err.message, 'error');
         } finally {
           button.disabled = false;

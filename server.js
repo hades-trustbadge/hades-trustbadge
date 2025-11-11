@@ -1,4 +1,5 @@
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const dotenv = require('dotenv');
 
@@ -11,11 +12,118 @@ const fetchFn =
 const app = express();
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const API_AUTH_TOKEN = (process.env.API_AUTH_TOKEN || '').trim();
+const API_ALLOWED_ORIGINS = (process.env.API_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
+  .map(entry => {
+    try {
+      const parsed = new URL(entry);
+      return { origin: parsed.origin.toLowerCase(), host: parsed.hostname.toLowerCase() };
+    } catch {
+      return { origin: null, host: entry.toLowerCase() };
+    }
+  });
+const API_AUTH_TOKEN_BUFFER = API_AUTH_TOKEN ? Buffer.from(API_AUTH_TOKEN) : null;
+
+function collectOriginCandidates(req) {
+  const candidates = [];
+  const seen = new Set();
+
+  function addCandidate(value) {
+    if (!value) return;
+
+    try {
+      const parsed = new URL(value);
+      const origin = parsed.origin.toLowerCase();
+      const host = parsed.hostname.toLowerCase();
+
+      if (origin && !seen.has(`origin:${origin}`)) {
+        seen.add(`origin:${origin}`);
+        candidates.push({ type: 'origin', value: origin });
+      }
+
+      if (host && !seen.has(`host:${host}`)) {
+        seen.add(`host:${host}`);
+        candidates.push({ type: 'host', value: host });
+      }
+    } catch {
+      const host = value.toLowerCase().split('/')[0];
+      if (host && !seen.has(`host:${host}`)) {
+        seen.add(`host:${host}`);
+        candidates.push({ type: 'host', value: host });
+      }
+    }
+  }
+
+  addCandidate(req.get('origin'));
+  addCandidate(req.get('referer'));
+  addCandidate(req.get('host') ? `http://${req.get('host')}` : null);
+  addCandidate(req.hostname ? `http://${req.hostname}` : null);
+
+  return candidates;
+}
+
+function isOriginAllowed(req) {
+  if (!API_ALLOWED_ORIGINS.length) {
+    return true;
+  }
+
+  const candidates = collectOriginCandidates(req);
+
+  return candidates.some(candidate =>
+    API_ALLOWED_ORIGINS.some(allowed => {
+      if (candidate.type === 'origin' && allowed.origin) {
+        return candidate.value === allowed.origin;
+      }
+
+      if (candidate.type === 'host') {
+        return candidate.value === allowed.host;
+      }
+
+      return false;
+    })
+  );
+}
+
+function ensureAuthenticated(req, res, next) {
+  if (!API_AUTH_TOKEN_BUFFER) {
+    return res
+      .status(500)
+      .json({ error: 'API_AUTH_TOKEN não configurada no servidor.' });
+  }
+
+  if (!isOriginAllowed(req)) {
+    return res.status(403).json({ error: 'Origem não autorizada.' });
+  }
+
+  const authorizationHeader = req.headers.authorization || '';
+  const token = authorizationHeader.startsWith('Bearer ')
+    ? authorizationHeader.slice(7).trim()
+    : null;
+
+  if (!token) {
+    return res.status(401).json({ error: 'Credenciais ausentes.' });
+  }
+
+  const providedBuffer = Buffer.from(token);
+
+  if (
+    providedBuffer.length !== API_AUTH_TOKEN_BUFFER.length ||
+    !crypto.timingSafeEqual(providedBuffer, API_AUTH_TOKEN_BUFFER)
+  ) {
+    return res.status(401).json({ error: 'Credenciais inválidas.' });
+  }
+
+  next();
+}
 
 app.use(express.json({ limit: '1mb' }));
+app.disable('x-powered-by');
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/ai', async (req, res) => {
+app.post('/api/ai', ensureAuthenticated, async (req, res) => {
   if (!OPENAI_API_KEY) {
     return res.status(500).json({ error: 'OPENAI_API_KEY não configurada.' });
   }
