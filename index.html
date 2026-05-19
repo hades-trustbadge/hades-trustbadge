@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Game Boy Pro Edition - Multi!</title>
+    <style>
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            user-select: none; -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;
+        }
+        :root {
+            --gb-darkest: #0f380f; --gb-dark: #306230; --gb-light: #8bac0f; --gb-lightest: #9bbc0f;
+            --gb-background: #c3dd84; --gb-case: #d3d0c8; --gb-case-dark: #8b8b83; --gb-case-shadow: #6b6b63;
+            --gb-button-a: #ab3e41; --gb-button-b: #ab3e41; --gb-button-dark: #433634; --gb-screen-frame: #403934;
+            --button-size: clamp(50px, 15vw, 80px); --dpad-size: clamp(140px, 30vw, 200px);
+            --action-button-size: clamp(60px, 13vw, 80px); --menu-button-width: clamp(60px, 15vw, 100px);
+            --menu-button-height: clamp(20px, 4vw, 30px);
+            --controls-spacing: clamp(20px, 5vw, 40px);
+            --hc-mode: 0; --hc-dark: #000000; --hc-light: #ffffff;
+        }
+        .high-contrast {
+            --gb-darkest: var(--hc-dark); --gb-dark: var(--hc-dark); --gb-light: var(--hc-light);
+            --gb-lightest: var(--hc-light); --gb-background: var(--hc-light); --hc-mode: 1;
+             --gb-button-a: var(--hc-dark); --gb-button-b: var(--hc-dark); --gb-button-dark: var(--hc-light);
+             --gb-case: var(--hc-dark); --gb-screen-frame: var(--hc-dark); --gb-case-shadow: var(--hc-dark);
+        }
+        @font-face {
+            font-family: 'PressStart2P';
+            src: url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+            font-display: swap;
+        }
+        body {
+            background-color: #333;
+            font-family: 'PressStart2P', monospace, sans-serif;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            min-height: 100vh;
+             height: 100vh;
+             overflow: hidden; position: fixed; width: 100%; touch-action: none;
+        }
+        #game-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px; }
+        #gameboy-container { width: 100%; max-width: 500px; max-height: 100%; display: flex; flex-direction: column; align-items: center; }
+        #screen-container {
+            width: 100%; position: relative; aspect-ratio: 10/9; margin-bottom: var(--controls-spacing);
+            border-radius: 12px 12px 50px 12px; overflow: hidden; background-color: var(--gb-case);
+            box-shadow: inset -3px -3px 5px var(--gb-case-shadow), inset 3px 3px 5px rgba(255, 255, 255, 0.3), 0 10px 20px rgba(0, 0, 0, 0.4);
+        }
+        .gameboy-mode #screen-container { padding: 35px 25px 60px 25px; background-image: radial-gradient(circle at 10% 10%, rgba(255,255,255,0.1) 10%, transparent 10.5%), radial-gradient(circle at 90% 5%, rgba(255,255,255,0.1) 10%, transparent 10.5%), linear-gradient(45deg, rgba(0,0,0,0.05) 0%, transparent 100%); }
+        .canvas-mode #screen-container { background-color: var(--gb-darkest); padding: 5px; border-radius: 10px; box-shadow: none; aspect-ratio: 160/144; }
+        #game-screen {
+            background-color: var(--gb-lightest); border: 10px solid var(--gb-screen-frame); border-radius: 5px;
+            margin-bottom: 10px; position: relative; width: 100%; height: 100%; overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.4);
+        }
+        .high-contrast #game-screen { background-color: var(--hc-light); border-color: var(--hc-dark); }
+        .canvas-mode #game-screen { border: 2px solid var(--gb-dark); margin-bottom: 0; }
+        .high-contrast.canvas-mode #game-screen { border-color: var(--hc-dark); }
+        #game-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: transparent;
+            display: none;
+        }
+        .nintendo-logo { color: #8b0000; text-align: center; font-weight: bold; font-style: italic; margin-bottom: 8px; font-size: min(2vw, 12px); letter-spacing: -0.3px; position: relative; font-family: monospace; }
+        .nintendo-logo::after { content: "®"; position: absolute; font-size: 50%; top: 0; margin-left: 2px; }
+        .high-contrast .nintendo-logo { color: var(--hc-dark); }
+        .gameboy-text { text-align: center; font-weight: bold; font-size: min(5vw, 20px); color: #5a0000; margin-bottom: 15px; letter-spacing: -1px; text-transform: uppercase; font-family: monospace, Arial, sans-serif; text-shadow: 1px 1px 0 rgba(255,255,255,0.5); }
+        .high-contrast .gameboy-text { color: var(--hc-dark); text-shadow: none; }
+        .canvas-mode .nintendo-logo, .canvas-mode .gameboy-text { display: none; }
+        #controls { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 600px; gap: var(--controls-spacing); }
+        #main-controls { display: flex; justify-content: space-between; width: 100%; align-items: center; padding: 0 10px; }
+        #d-pad {
+            position: relative;
+            width: var(--dpad-size); height: var(--dpad-size);
+        }
+        .gameboy-mode #d-pad { background-color: rgba(0,0,0,0.05); border-radius: 50%; }
+        .d-button {
+            position: absolute;
+            background-color: #333;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5), inset -2px -2px 3px rgba(0,0,0,0.5), inset 2px 2px 3px rgba(255,255,255,0.1);
+            display: flex; justify-content: center; align-items: center;
+            color: #666; font-weight: bold; font-size: calc(var(--dpad-size) * 0.15);
+            -webkit-user-select: none; user-select: none;
+            border: none; transition: all 0.05s ease;
+            z-index: 1;
+        }
+        #btn-up { top: 0; left: calc(50% - 16.66%); width: 33.33%; height: 40%; border-radius: 5px 5px 0 0; padding-bottom: 5%; }
+        #btn-down { bottom: 0; left: calc(50% - 16.66%); width: 33.33%; height: 40%; border-radius: 0 0 5px 5px; padding-top: 5%; }
+        #btn-left { top: calc(50% - 16.66%); left: 0; width: 40%; height: 33.33%; border-radius: 5px 0 0 5px; padding-right: 5%; }
+        #btn-right { top: calc(50% - 16.66%); right: 0; width: 40%; height: 33.33%; border-radius: 0 5px 5px 0; padding-left: 5%; }
+        #dpad-center {
+            position: absolute;
+            top: calc(50% - 16.66%); left: calc(50% - 16.66%);
+            width: 33.33%; height: 33.33%;
+            background-color: #333;
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.5);
+            border-radius: 50%;
+            z-index: 0;
+        }
+        #action-buttons { display: flex; gap: calc(var(--action-button-size) * 0.5); }
+        .action-button {
+            background-color: var(--gb-button-a); color: var(--gb-button-dark);
+            width: var(--action-button-size); height: var(--action-button-size); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-weight: bold;
+            font-size: calc(var(--action-button-size) * 0.4); border: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5), inset -3px -3px 5px rgba(0,0,0,0.3), inset 3px 3px 5px rgba(255,255,255,0.2);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5); transition: all 0.05s ease; position: relative;
+        }
+        .gameboy-mode .action-button::after {
+            content: ""; position: absolute; width: 90%; height: 90%; border-radius: 50%;
+            background: radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2) 0%, transparent 60%);
+        }
+        .high-contrast .action-button::after { display: none; }
+        #menu-buttons { display: flex; justify-content: center; width: 100%; gap: calc(var(--menu-button-width) * 0.5); }
+        .menu-container { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .menu-button {
+            background-color: #555; width: var(--menu-button-width); height: var(--menu-button-height);
+            border-radius: 10px; transform: rotate(-25deg);
+            box-shadow: 0 3px 5px rgba(0,0,0,0.5), inset -2px -2px 3px rgba(0,0,0,0.3), inset 2px 2px 3px rgba(255,255,255,0.1);
+            border: none; transition: all 0.05s ease;
+        }
+        .button-label { font-size: min(2.5vw, 10px); text-align: center; font-weight: bold; font-family: monospace; text-transform: uppercase; }
+        .gameboy-mode .button-label {
+            color: var(--gb-case-shadow); text-shadow: 0.5px 0.5px 0 rgba(255,255,255,0.5); transform: rotate(-15deg);
+        }
+        .canvas-mode .d-button, .high-contrast .d-button,
+        .canvas-mode #dpad-center, .high-contrast #dpad-center,
+        .canvas-mode .action-button, .high-contrast .action-button,
+        .canvas-mode .menu-button, .high-contrast .menu-button {
+            background-color: var(--gb-dark);
+            color: var(--gb-lightest);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            text-shadow: none;
+            transform: none;
+            border-radius: 4px;
+        }
+        .canvas-mode .action-button, .high-contrast .action-button { border-radius: 50%; }
+        .canvas-mode #dpad-center, .high-contrast #dpad-center { border-radius: 50%; }
+        .canvas-mode #btn-up { border-radius: 4px 4px 0 0; }
+        .canvas-mode #btn-down { border-radius: 0 0 4px 4px; }
+        .canvas-mode #btn-left { border-radius: 4px 0 0 4px; }
+        .canvas-mode #btn-right { border-radius: 0 4px 4px 0; }
+        .canvas-mode .button-label, .high-contrast .button-label {
+            transform: none; color: var(--gb-lightest); text-shadow: none;
+        }
+        #a11y-controls { position: absolute; top: 10px; right: 10px; display: flex; gap: 10px; z-index: 100; }
+        .a11y-button { width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.2); border: 2px solid #fff; color: #fff; font-size: 20px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: background-color 0.2s ease; font-family: sans-serif; }
+        .a11y-button:hover { background-color: rgba(255,255,255,0.3); }
+        #start-screen, #game-over-screen, #pause-screen, #game-selection-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background-color: var(--gb-lightest); z-index: 10; text-align: center; padding: 20px;
+            font-family: 'PressStart2P', monospace, sans-serif;
+        }
+        .high-contrast #start-screen, .high-contrast #game-over-screen, .high-contrast #pause-screen, .high-contrast #game-selection-screen { background-color: var(--hc-light); }
+        #start-screen { display: flex; }
+        #game-over-screen, #pause-screen, #game-selection-screen { display: none; }
+        .screen-title { font-size: min(6vw, 18px); color: var(--gb-darkest); margin-bottom: 20px; text-transform: uppercase; letter-spacing: -1px; text-shadow: 1px 1px 0 var(--gb-light); }
+        .high-contrast .screen-title { color: var(--hc-dark); text-shadow: none; }
+        .screen-text { font-size: min(4vw, 12px); color: var(--gb-darkest); margin-bottom: 15px; font-family: monospace, sans-serif; }
+        .high-contrast .screen-text { color: var(--hc-dark); }
+        .blink { animation: blink 1s infinite; }
+        @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+        #game-list { list-style: none; padding: 0; margin: 20px 0; font-size: min(5vw, 16px); color: var(--gb-darkest); font-family: monospace, sans-serif; }
+        .high-contrast #game-list { color: var(--hc-dark); }
+        .game-option { margin: 10px 0; padding: 5px 10px; cursor: pointer; transition: background-color 0.1s; border: 2px solid transparent; text-transform: uppercase; }
+        .game-option.selected { background-color: var(--gb-dark); color: var(--gb-lightest); border: 2px dashed var(--gb-lightest); }
+        .game-option.selected::before { content: '▶ '; font-weight: normal; display: inline-block; width: 1.2em; text-align: right; margin-right: 3px; }
+        .high-contrast .game-option.selected { background-color: var(--hc-dark); color: var(--hc-light); border-color: var(--hc-light); }
+        .high-contrast .game-option.selected::before { color: var(--hc-light); }
+        .active { filter: brightness(0.8); transform: scale(0.95); }
+        .key-hints { position: absolute; bottom: 5px; left: 5px; font-size: 9px; color: var(--gb-darkest); background-color: rgba(139, 172, 15, 0.7); padding: 3px 5px; border-radius: 4px; font-family: monospace, sans-serif; z-index: 5; }
+        .high-contrast .key-hints { color: var(--hc-dark); background-color: rgba(255, 255, 255, 0.5); }
+        #view-toggle { position: absolute; top: 10px; left: 10px; z-index: 100; background-color: rgba(255,255,255,0.2); border: 2px solid #fff; color: #fff; padding: 5px 10px; border-radius: 20px; font-size: 11px; cursor: pointer; transition: background-color 0.2s ease; font-family: monospace, sans-serif; }
+        #view-toggle:hover { background-color: rgba(255,255,255,0.3); }
+        .large-text .screen-title { font-size: min(8vw, 24px); }
+        .large-text .screen-text, .large-text #game-list { font-size: min(6vw, 18px); }
+        .large-text .button-label { font-size: min(4vw, 14px); }
+        #toast-container { position: fixed; bottom: 20px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; pointer-events: none; z-index: 1000; }
+        .toast { background-color: rgba(15, 56, 15, 0.85); color: var(--gb-lightest); border: 1px solid var(--gb-light); padding: 8px 15px; border-radius: 5px; margin: 5px; opacity: 0; transition: opacity 0.3s ease-out, transform 0.3s ease-out; font-family: monospace, sans-serif; font-size: 11px; transform: translateY(20px); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .high-contrast .toast { background-color: rgba(0,0,0,0.85); color: #fff; border-color: #fff;}
+        .gameboy-details { position: absolute; width: 100%; height: 100%; pointer-events: none; }
+        .gameboy-speaker { position: absolute; bottom: 15%; right: 10%; width: 25%; height: 8%; display: flex; flex-wrap: wrap; justify-content: space-between; align-content: space-between; transform: rotate(-15deg); }
+        .speaker-hole { width: 10%; padding-bottom: 10%; height: 0; background-color: var(--gb-case-shadow); border-radius: 50%; opacity: 0.7; }
+        .high-contrast .speaker-hole { background-color: var(--hc-dark); }
+        .gameboy-power { position: absolute; top: 20px; left: 20px; width: 8px; height: 8px; border-radius: 50%; background-color: #a00; box-shadow: 0 0 3px rgba(0,0,0,0.5); transition: background-color 0.3s, box-shadow 0.3s; }
+        .gameboy-power.on { background-color: #f00; box-shadow: 0 0 5px 2px rgba(255,0,0,0.5); }
+        .gameboy-power::after { content: "POWER"; position: absolute; font-size: 7px; color: var(--gb-case-shadow); top: 10px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: monospace, sans-serif; }
+        .high-contrast .gameboy-power::after { color: var(--hc-dark); }
+        .canvas-mode .gameboy-details { display: none; }
+        @media (max-width: 767px) {
+             :root { --dpad-size: clamp(140px, 38vw, 180px); --action-button-size: clamp(60px, 18vw, 80px); --menu-button-width: clamp(60px, 20vw, 100px); }
+             #controls { gap: 15px; }
+        }
+        @media (min-width: 768px) and (max-width: 1024px) {
+              :root { --dpad-size: clamp(160px, 25vw, 200px); --action-button-size: clamp(70px, 14vw, 90px); }
+        }
+        @media (max-height: 500px) and (orientation: landscape) {
+             #game-wrapper { flex-direction: row; gap: 10px; padding: 5px; }
+             #gameboy-container { width: 50%; max-width: none; }
+             #controls { width: 45%; gap: 10px; }
+             :root { --dpad-size: clamp(110px, 22vh, 140px); --action-button-size: clamp(45px, 10vh, 60px); --menu-button-width: clamp(45px, 10vh, 65px); --menu-button-height: clamp(15px, 3.5vh, 20px); --controls-spacing: 10px;}
+             #main-controls { flex-direction: column; align-items: center; gap: 15px; padding: 0; }
+             #menu-buttons { flex-direction: row; gap: 15px; margin-top: 10px;}
+             .menu-button, .button-label { transform: none; }
+             .gameboy-mode .menu-button { transform: rotate(-25deg); }
+             .gameboy-mode .button-label { transform: rotate(-15deg); }
+             .canvas-mode .menu-button, .canvas-mode .button-label { transform: none; }
+        }
+        #loading-placeholder {
+            position: absolute; inset: 0; background: var(--gb-lightest); color: var(--gb-darkest);
+            display: none; justify-content: center; align-items: center; font-family: monospace, sans-serif;
+            font-size: 14px; z-index: 11; text-align: center; padding: 10px;
+        }
+        .high-contrast #loading-placeholder { background: var(--hc-light); color: var(--hc-dark); }
+        .tetris-grid-line { stroke: var(--gb-light); stroke-width: 0.5; }
+        .high-contrast .tetris-grid-line { stroke: var(--hc-dark); }
+    </style>
+</head>
+<body>
+    <audio id="bgm-menu" src="https://blacksharkinnovation.org/menu.mp3" loop preload="auto"></audio>
+    <audio id="bgm-game" src="https://blacksharkinnovation.org/game.mp3" loop preload="auto"></audio>
+    <div id="a11y-controls">
+        <button class="a11y-button" id="contrast-toggle" aria-label="Alternar alto contraste"><span aria-hidden="true">Aa</span></button>
+        <button class="a11y-button" id="text-size-toggle" aria-label="Alternar tamanho do texto"><span aria-hidden="true">A+</span></button>
+    </div>
+    <button id="view-toggle">Alternar Visualização</button>
+    <div id="game-wrapper" class="gameboy-mode">
+        <div id="gameboy-container">
+            <div id="screen-container">
+                <div class="gameboy-details"> <div class="gameboy-speaker"></div> <div class="gameboy-power" id="power-led"></div> </div>
+                <div class="nintendo-logo">Nintendo</div> <div class="gameboy-text">GAME BOY</div>
+                <div id="game-screen">
+                    <canvas id="game-canvas"></canvas>
+                    <div id="start-screen"><div class="screen-title">GAME BOY</div><div class="screen-text">PRO EDITION</div><div class="screen-text blink">PRESS START</div><div class="key-hints">Setas/DPad: Mover | A/Z/Spc/K: Ação/Rot/Salto/Lançar | B/X/L: Ação/Rot/Lançar | Start/Ent: Iniciar/Pausar | Select/Shft: Menu</div></div>
+                    <div id="game-selection-screen"><div class="screen-title">SELECT GAME</div><ul id="game-list"><li class="game-option selected" data-game="tetris">TETRIS</li><li class="game-option" data-game="snake">SNAKE</li><li class="game-option" data-game="platformer">PLATFORMER</li><li class="game-option" data-game="breakout">BREAKOUT</li></ul><div class="screen-text blink">PRESS START</div></div>
+                    <div id="game-over-screen"><div class="screen-title">GAME OVER</div><div class="screen-text">SCORE: <span id="final-score">0</span></div><div class="screen-text blink">PRESS START</div></div>
+                    <div id="pause-screen"><div class="screen-title">PAUSED</div><div class="screen-text">SCORE: <span id="pause-score">0</span></div> <div class="screen-text blink">PRESS START</div></div>
+                    <div id="loading-placeholder"></div>
+                </div>
+            </div>
+            <div id="controls">
+                <div id="main-controls">
+                    <div id="d-pad">
+                        <button class="d-button" id="btn-up" aria-label="Cima/Girar/Saltar/Lançar">▲</button>
+                        <button class="d-button" id="btn-down" aria-label="Baixo/Drop">▼</button>
+                        <button class="d-button" id="btn-left" aria-label="Esquerda">◀</button>
+                        <button class="d-button" id="btn-right" aria-label="Direita">▶</button>
+                        <div id="dpad-center"></div>
+                    </div>
+                    <div id="action-buttons">
+                        <button class="action-button" id="btn-b" aria-label="Ação Secundária/Girar/Lançar">B</button>
+                        <button class="action-button" id="btn-a" aria-label="Ação Principal/Girar/Saltar/Lançar">A</button>
+                    </div>
+                </div>
+                <div id="menu-buttons">
+                    <div class="menu-container"><button class="menu-button" id="btn-select" aria-label="Botão Select"></button><div class="button-label">SELECT</div></div>
+                    <div class="menu-container"><button class="menu-button" id="btn-start" aria-label="Botão Start"></button><div class="button-label">START</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="toast-container"></div>
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('start-screen');
+        const gameSelectionScreen = document.getElementById('game-selection-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const pauseScreen = document.getElementById('pause-screen');
+        const loadingPlaceholder = document.getElementById('loading-placeholder');
+        const finalScoreElement = document.getElementById('final-score');
+        const pauseScoreElement = document.getElementById('pause-score');
+        const powerLed = document.getElementById('power-led');
+        const btnUp = document.getElementById('btn-up'), btnDown = document.getElementById('btn-down'), btnLeft = document.getElementById('btn-left'), btnRight = document.getElementById('btn-right');
+        const btnA = document.getElementById('btn-a'), btnB = document.getElementById('btn-b'), btnStart = document.getElementById('btn-start'), btnSelect = document.getElementById('btn-select');
+        const contrastToggle = document.getElementById('contrast-toggle'), textSizeToggle = document.getElementById('text-size-toggle'), viewToggle = document.getElementById('view-toggle');
+        const gameWrapper = document.getElementById('game-wrapper');
+        const menuMusic = document.getElementById('bgm-menu');
+        const gameMusic = document.getElementById('bgm-game');
+        let currentGameState = 'TITLE';
+        let activeGame = null;
+        let score = 0;
+        let level = 1;
+        let highScore = 0;
+        let gamePaused = false;
+        let selectedGameIndex = 0;
+        let gameOptions = [];
+        let animationFrameId = null;
+        let lastTime = 0;
+        let musicVolume = 0.3;
+        const GAME_WIDTH = 160;
+        const GAME_HEIGHT = 144;
+        const GB_COLORS = {};
+        const keys = { left: false, right: false, up: false, down: false, a: false, b: false, start: false, select: false };
+        let keyRepeatDelay = 150;
+        let keyRepeatInterval = 50;
+        let keyHeld = { key: null, timer: null, interval: null };
+        const TETRIS_COLS = 10; const TETRIS_ROWS = 20; const TETRIS_BLOCK_SIZE = 7;
+        const TETRIS_BOARD_WIDTH = TETRIS_COLS * TETRIS_BLOCK_SIZE; const TETRIS_BOARD_HEIGHT = TETRIS_ROWS * TETRIS_BLOCK_SIZE;
+        const TETRIS_BOARD_X = Math.floor((GAME_WIDTH - TETRIS_BOARD_WIDTH - (TETRIS_BLOCK_SIZE * 5)) / 2);
+        const TETRIS_BOARD_Y = Math.floor((GAME_HEIGHT - TETRIS_BOARD_HEIGHT) / 2);
+        const TETRIS_INFO_X = TETRIS_BOARD_X + TETRIS_BOARD_WIDTH + TETRIS_BLOCK_SIZE;
+        let tetrisBoard = []; let currentPiece; let nextPiece; let dropCounter = 0; let dropInterval = 1000;
+        let linesCleared = 0; let tetrisGameOver = false;
+        const TETROMINOES = { 'I': [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], 'O': [[1,1],[1,1]], 'T': [[0,1,0],[1,1,1],[0,0,0]], 'S': [[0,1,1],[1,1,0],[0,0,0]], 'Z': [[1,1,0],[0,1,1],[0,0,0]], 'J': [[1,0,0],[1,1,1],[0,0,0]], 'L': [[0,0,1],[1,1,1],[0,0,0]] };
+        const PIECE_COLORS = { 'I': 0, 'O': 1, 'T': 2, 'S': 0, 'Z': 1, 'J': 2, 'L': 0 };
+        const SNAKE_BLOCK_SIZE = 8;
+        const SNAKE_BOARD_WIDTH = Math.floor(GAME_WIDTH / SNAKE_BLOCK_SIZE);
+        const SNAKE_BOARD_HEIGHT = Math.floor(GAME_HEIGHT / SNAKE_BLOCK_SIZE);
+        let snake = []; let food = null; let snakeDirection = { x: 1, y: 0 }; let nextDirection = { x: 1, y: 0 };
+        let snakeSpeed = 200; let lastMoveTime = 0; let snakeGameOver = false;
+        const PLATFORMER_GRAVITY = 0.3; const PLATFORMER_PLAYER_SPEED = 2; const PLATFORMER_JUMP_FORCE = -6;
+        const PLATFORMER_TILE_SIZE = 8;
+        let player = { x: 0, y: 0, width: PLATFORMER_TILE_SIZE, height: PLATFORMER_TILE_SIZE, vx: 0, vy: 0, onGround: false };
+        let platformerMap = []; let collectibles = []; let goal = null;
+        let platformerGameOver = false; let platformerWin = false;
+        const level1Map = [ "00000000000000000000", "00000000000000000000", "00000000000000000000", "00000000000000000000", "00200000000000030000", "11111000111111111111", "00000000000000000000", "00000111110000003000", "00000000000001111110", "00000000000000000000", "00011110003000111000", "00000000111110000000", "00000000000000003000", "11110000000001111111", "00000011110000000000", "30000000000000040000", "11111111111111111111", "00000000000000000000", ];
+        const PADDLE_WIDTH = 32; const PADDLE_HEIGHT = 6; const PADDLE_SPEED = 4;
+        const BALL_RADIUS = 3; let BALL_SPEED = 1.5;
+        const BRICK_ROWS = 5; const BRICK_COLS = 10; const BRICK_WIDTH = 14; const BRICK_HEIGHT = 6;
+        const BRICK_PADDING = 1; const BRICK_OFFSET_TOP = 20; const BRICK_OFFSET_LEFT = (GAME_WIDTH - (BRICK_COLS * (BRICK_WIDTH + BRICK_PADDING)) + BRICK_PADDING) / 2;
+        const INITIAL_LIVES = 3;
+        let paddle = { x: GAME_WIDTH / 2 - PADDLE_WIDTH / 2, y: GAME_HEIGHT - PADDLE_HEIGHT - 5, width: PADDLE_WIDTH, height: PADDLE_HEIGHT };
+        let ball = { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2, radius: BALL_RADIUS, vx: 0, vy: 0 };
+        let bricks = []; let lives = INITIAL_LIVES;
+        let breakoutGameOver = false; let breakoutLevelComplete = false; let ballIsMoving = false;
+        let gbAudioContext;
+        function getAudioContext() {
+            if (!gbAudioContext) {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    gbAudioContext = new AudioContext();
+                } catch (e) { console.error("Web Audio API não suportada:", e); }
+            }
+            return gbAudioContext;
+        }
+        function createSound(type) {
+             return function play(volume = 0.1) {
+                 const audioCtx = getAudioContext();
+                 if (!audioCtx) return;
+                 if (audioCtx.state === 'suspended') { audioCtx.resume().catch(e => console.error("Audio resume failed:", e)); }
+                 if (audioCtx.state !== 'running') { console.warn("AudioContext not running, cannot play sound."); return; }
+                 const oscillator = audioCtx.createOscillator();
+                 const gainNode = audioCtx.createGain();
+                 gainNode.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+                 oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+                 gainNode.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + 0.005);
+                 let duration = 0.1;
+                 oscillator.type = 'square';
+                 if (type === 'tetrisMove') { duration = 0.03; oscillator.frequency.setValueAtTime(300, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(volume * 0.8, audioCtx.currentTime + duration * 0.5); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'tetrisRotate') { duration = 0.05; oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(400, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'tetrisLand') { duration = 0.06; oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(volume * 1.2, audioCtx.currentTime + duration * 0.5); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'tetrisLineClear') { duration = 0.3; oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'tetrisTetrisClear') { duration = 0.5; oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(1600, audioCtx.currentTime + duration * 0.3); oscillator.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'tetrisLevelUp') { duration = 0.4; oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(500, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(1000, audioCtx.currentTime + duration * 0.5); oscillator.frequency.linearRampToValueAtTime(700, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'gameOver') { duration = 1.0; oscillator.type = 'noise'; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.Q.value = 5; filter.frequency.setValueAtTime(1500, audioCtx.currentTime); filter.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + duration); oscillator.connect(filter); filter.connect(gainNode); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'button') { duration = 0.05; oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'start') { duration = 0.2; oscillator.type = 'square'; oscillator.frequency.setValueAtTime(261.63, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(523.25, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'pause') { duration = 0.1; oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(220, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'snakeEat') { duration = 0.08; oscillator.frequency.setValueAtTime(550, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'snakeDie') { duration = 0.5; oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'jump') { duration = 0.1; oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(1000, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'land') { duration = 0.05; oscillator.frequency.setValueAtTime(200, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'coin') { duration = 0.15; oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(1318.51, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'hurt') { duration = 0.2; oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(300, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'win') { duration = 0.8; oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(523, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(659, audioCtx.currentTime + duration * 0.3); oscillator.frequency.linearRampToValueAtTime(783, audioCtx.currentTime + duration * 0.6); oscillator.frequency.linearRampToValueAtTime(1046, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'paddleHit') { duration = 0.04; oscillator.frequency.setValueAtTime(250, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'wallHit') { duration = 0.03; oscillator.frequency.setValueAtTime(400, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'brickHit') { duration = 0.06; oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'brickBreak') { duration = 0.08; oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 else if (type === 'loseLife') { duration = 0.4; oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(200, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + duration); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration); }
+                 oscillator.start(audioCtx.currentTime);
+                 oscillator.stop(audioCtx.currentTime + duration);
+             };
+        }
+        const soundEffects = {
+            buttonClick: createSound('button'), start: createSound('start'),
+            gameOver: createSound('gameOver'), pause: createSound('pause'),
+            tetrisMove: createSound('tetrisMove'), tetrisRotate: createSound('tetrisRotate'), tetrisLand: createSound('tetrisLand'),
+            tetrisLineClear: createSound('tetrisLineClear'), tetrisTetrisClear: createSound('tetrisTetrisClear'), tetrisLevelUp: createSound('tetrisLevelUp'),
+            snakeEat: createSound('snakeEat'), snakeDie: createSound('snakeDie'),
+            jump: createSound('jump'), land: createSound('land'), coin: createSound('coin'), hurt: createSound('hurt'), win: createSound('win'),
+            paddleHit: createSound('paddleHit'), wallHit: createSound('wallHit'), brickHit: createSound('brickHit'), brickBreak: createSound('brickBreak'), loseLife: createSound('loseLife')
+        };
+        function updateMusicState() {
+            if (!menuMusic || !gameMusic) return;
+            const safePlay = (audioElement) => {
+                audioElement.volume = musicVolume;
+                if (audioElement.paused) {
+                   const playPromise = audioElement.play();
+                   if (playPromise !== undefined) {
+                       playPromise.catch(error => {
+                           console.warn("Music playback failed (might require user interaction):", error);
+                       });
+                   }
+                }
+            };
+            const safePause = (audioElement) => {
+               if (!audioElement.paused) {
+                   audioElement.pause();
+                   audioElement.currentTime = 0;
+               }
+            };
+            switch (currentGameState) {
+                case 'MENU':
+                    safePause(gameMusic);
+                    safePlay(menuMusic);
+                    break;
+                case 'TETRIS':
+                case 'SNAKE':
+                case 'PLATFORMER':
+                case 'BREAKOUT':
+                    safePause(menuMusic);
+                    if (!gamePaused) {
+                       safePlay(gameMusic);
+                    } else {
+                       safePause(gameMusic);
+                    }
+                    break;
+                case 'PAUSED':
+                    safePause(gameMusic);
+                    safePause(menuMusic);
+                    break;
+                case 'TITLE':
+                case 'GAMEOVER':
+                case 'LOADING':
+                default:
+                    safePause(menuMusic);
+                    safePause(gameMusic);
+                    break;
+            }
+        }
+        function showToast(message, duration = 1500) {
+            const toastContainer = document.getElementById('toast-container');
+            if (toastContainer.children.length > 2) { toastContainer.removeChild(toastContainer.firstChild); }
+            const toast = document.createElement('div'); toast.className = 'toast'; toast.textContent = message;
+            toastContainer.appendChild(toast);
+            setTimeout(() => { toast.classList.add('show'); }, 10);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, duration);
+        }
+        function updateGBColors() {
+             const styles = getComputedStyle(document.documentElement);
+             GB_COLORS[0] = styles.getPropertyValue('--gb-darkest').trim();
+             GB_COLORS[1] = styles.getPropertyValue('--gb-dark').trim();
+             GB_COLORS[2] = styles.getPropertyValue('--gb-light').trim();
+             GB_COLORS[3] = styles.getPropertyValue('--gb-lightest').trim();
+             GB_COLORS.BG = GB_COLORS[3];
+             GB_COLORS.TEXT = GB_COLORS[0];
+             GB_COLORS.GRID = GB_COLORS[2];
+             GB_COLORS.PLAYER = GB_COLORS[0];
+             GB_COLORS.PLATFORM = GB_COLORS[1];
+             GB_COLORS.COLLECTIBLE = GB_COLORS[0];
+             GB_COLORS.GOAL = GB_COLORS[2];
+             GB_COLORS.PADDLE = GB_COLORS[0];
+             GB_COLORS.BALL = GB_COLORS[0];
+             GB_COLORS.BRICK1 = GB_COLORS[1];
+             GB_COLORS.BRICK2 = GB_COLORS[2];
+        }
+        function createTetrisBoard() { return Array.from({ length: TETRIS_ROWS }, () => Array(TETRIS_COLS).fill(0)); }
+        function getRandomPiece() { const pieces = 'IOTSLJZ'; const type = pieces[Math.floor(Math.random() * pieces.length)]; const matrix = TETROMINOES[type]; let initialX = Math.floor(TETRIS_COLS / 2) - Math.floor(matrix[0].length / 2); let initialY = 0; for(let r=0; r<matrix.length; ++r) { if (matrix[r].some(cell => cell !== 0)) break; initialY--; } return { matrix: matrix, type: type, pos: { x: initialX, y: initialY }, colorIndex: PIECE_COLORS[type] }; }
+        function rotateMatrix(matrix, dir) { const N = matrix.length; const newMatrix = Array.from({ length: N }, () => Array(N).fill(0)); for (let y = 0; y < N; ++y) { for (let x = 0; x < N; ++x) { if (dir > 0) newMatrix[x][N - 1 - y] = matrix[y][x]; else newMatrix[N - 1 - x][y] = matrix[y][x]; } } return newMatrix; }
+        function pieceRotate(dir) { if (!currentPiece || tetrisGameOver || gamePaused) return; const originalPos = { ...currentPiece.pos }; const originalMatrix = currentPiece.matrix; currentPiece.matrix = rotateMatrix(currentPiece.matrix, dir); const kickOffsets = [ [0, 0], [-1*dir, 0], [1*dir, 0], [0, 1], [-1*dir, 1], [1*dir, 1], [-2*dir, 0], [2*dir, 0] ]; let rotated = false; for (const offset of kickOffsets) { currentPiece.pos.x = originalPos.x + offset[0]; currentPiece.pos.y = originalPos.y + offset[1]; if (!checkTetrisCollision()) { rotated = true; break; } } if (!rotated) { currentPiece.matrix = originalMatrix; currentPiece.pos = originalPos; } else { soundEffects.tetrisRotate(); } }
+        function pieceMove(dir) { if (!currentPiece || tetrisGameOver || gamePaused) return; currentPiece.pos.x += dir; if (checkTetrisCollision()) { currentPiece.pos.x -= dir; } else { soundEffects.tetrisMove(0.05); } }
+        function pieceDrop() { if (!currentPiece || tetrisGameOver || gamePaused) return; dropCounter = 0; currentPiece.pos.y++; if (checkTetrisCollision()) { currentPiece.pos.y--; mergePieceToBoard(); sweepLines(); resetPiece(); if (checkTetrisCollision()) { tetrisGameOver = true; endGame(); } } }
+        function pieceHardDrop() { if (!currentPiece || tetrisGameOver || gamePaused) return; soundEffects.tetrisLand(0.05); let linesDropped = 0; while (!checkTetrisCollision()) { currentPiece.pos.y++; linesDropped++; } currentPiece.pos.y--; score += linesDropped; mergePieceToBoard(); sweepLines(); resetPiece(); if (checkTetrisCollision()) { tetrisGameOver = true; endGame(); } dropCounter = 0; }
+        function checkTetrisCollision() { if (!currentPiece) return false; const { matrix, pos } = currentPiece; for (let y = 0; y < matrix.length; ++y) { for (let x = 0; x < matrix[y].length; ++x) { if (matrix[y][x] !== 0) { let checkX = pos.x + x; let checkY = pos.y + y; if (checkX < 0 || checkX >= TETRIS_COLS || checkY >= TETRIS_ROWS || (checkY >= 0 && tetrisBoard[checkY]?.[checkX] !== 0)) return true; } } } return false; }
+        function mergePieceToBoard() { if (!currentPiece) return; const { matrix, pos, colorIndex } = currentPiece; matrix.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { const boardY = pos.y + y; const boardX = pos.x + x; if (boardY >= 0 && boardY < TETRIS_ROWS && boardX >= 0 && boardX < TETRIS_COLS) { tetrisBoard[boardY][boardX] = colorIndex + 1; } } }); }); soundEffects.tetrisLand(); }
+        function resetPiece() { currentPiece = nextPiece ? { ...nextPiece } : getRandomPiece(); nextPiece = getRandomPiece(); let initialY = 0; for(let r=0; r<currentPiece.matrix.length; ++r) { if (currentPiece.matrix[r].some(cell => cell !== 0)) break; initialY--; } currentPiece.pos = { x: Math.floor(TETRIS_COLS / 2) - Math.floor(currentPiece.matrix[0].length / 2), y: initialY }; dropInterval = Math.max(100, 1000 - (level - 1) * 75); }
+        function sweepLines() { let linesClearedThisTurn = 0; for (let y = TETRIS_ROWS - 1; y >= 0; ) { if (tetrisBoard[y].every(cell => cell !== 0)) { tetrisBoard.splice(y, 1); tetrisBoard.unshift(Array(TETRIS_COLS).fill(0)); linesClearedThisTurn++; } else { y--; } } if (linesClearedThisTurn > 0) { let points = [0, 40, 100, 300, 1200][linesClearedThisTurn] || 1200; score += points * level; linesCleared += linesClearedThisTurn; if (linesClearedThisTurn >= 4) { soundEffects.tetrisTetrisClear(); showToast("TETRIS!", 1000); } else { soundEffects.tetrisLineClear(); } const newLevel = Math.floor(linesCleared / 10) + 1; if (newLevel > level) { level = newLevel; dropInterval = Math.max(100, 1000 - (level - 1) * 75); soundEffects.tetrisLevelUp(); showToast(`Level ${level}!`, 1500); } updateHighScore(); finalScoreElement.textContent = score; pauseScoreElement.textContent = score; } }
+        function initTetris() { console.log("Initializing Tetris..."); updateGBColors(); tetrisBoard = createTetrisBoard(); score = 0; level = 1; linesCleared = 0; dropInterval = 1000; dropCounter = 0; tetrisGameOver = false; gamePaused = false; currentGameState = 'TETRIS'; activeGame = 'tetris'; loadHighScore(); resetPiece(); resetPiece(); removeLoadingPlaceholder(); canvas.style.display = 'block'; showToast('Tetris Iniciado!'); lastTime = performance.now(); updateMusicState(); startGameLoop(); console.log("Tetris Initialized. Canvas visible:", canvas.style.display); }
+        function resetTetris() { tetrisBoard = []; currentPiece = null; nextPiece = null; tetrisGameOver = false; console.log("Tetris reset"); }
+        function updateTetris(deltaTime) { if (gamePaused || tetrisGameOver || !currentPiece) return; handleKeyRepeat(); dropCounter += deltaTime; if (dropCounter > dropInterval) { pieceDrop(); dropCounter %= dropInterval; } }
+        function drawTetris() { if (currentGameState !== 'TETRIS' && !(currentGameState === 'PAUSED' && activeGame === 'tetris')) return; ctx.fillStyle = GB_COLORS.BG; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); ctx.strokeStyle = GB_COLORS.GRID; ctx.lineWidth = 0.5; for (let x = 0; x <= TETRIS_COLS; ++x) { ctx.beginPath(); ctx.moveTo(TETRIS_BOARD_X + x * TETRIS_BLOCK_SIZE, TETRIS_BOARD_Y); ctx.lineTo(TETRIS_BOARD_X + x * TETRIS_BLOCK_SIZE, TETRIS_BOARD_Y + TETRIS_BOARD_HEIGHT); ctx.stroke(); } for (let y = 0; y <= TETRIS_ROWS; ++y) { ctx.beginPath(); ctx.moveTo(TETRIS_BOARD_X, TETRIS_BOARD_Y + y * TETRIS_BLOCK_SIZE); ctx.lineTo(TETRIS_BOARD_X + TETRIS_BOARD_WIDTH, TETRIS_BOARD_Y + y * TETRIS_BLOCK_SIZE); ctx.stroke(); } tetrisBoard.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { drawTetrisBlock(x, y, value - 1); } }); }); if (currentPiece) { currentPiece.matrix.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { drawTetrisBlock(currentPiece.pos.x + x, currentPiece.pos.y + y, currentPiece.colorIndex); } }); }); } ctx.fillStyle = GB_COLORS.TEXT; ctx.font = "8px monospace, sans-serif"; ctx.textAlign = 'left'; const infoYStart = TETRIS_BOARD_Y + 5; const infoLineHeight = 10; ctx.fillText("SCORE", TETRIS_INFO_X, infoYStart); ctx.fillText(score.toString().padStart(6, '0'), TETRIS_INFO_X, infoYStart + infoLineHeight); ctx.fillText("LEVEL", TETRIS_INFO_X, infoYStart + infoLineHeight * 2.5); ctx.fillText(level.toString().padStart(2, '0'), TETRIS_INFO_X, infoYStart + infoLineHeight * 3.5); ctx.fillText("LINES", TETRIS_INFO_X, infoYStart + infoLineHeight * 5); ctx.fillText(linesCleared.toString().padStart(3, '0'), TETRIS_INFO_X, infoYStart + infoLineHeight * 6); ctx.fillText("NEXT", TETRIS_INFO_X, infoYStart + infoLineHeight * 7.5); if (nextPiece) { const nextX = TETRIS_INFO_X; const nextY = infoYStart + infoLineHeight * 8.5; const matrixWidth = nextPiece.matrix[0].length * TETRIS_BLOCK_SIZE; const previewAreaWidth = TETRIS_BLOCK_SIZE * 4; const offsetX = Math.floor((previewAreaWidth - matrixWidth) / 2); nextPiece.matrix.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { drawTetrisBlockAbsolute(nextX + offsetX + x * TETRIS_BLOCK_SIZE, nextY + y * TETRIS_BLOCK_SIZE, nextPiece.colorIndex); } }); }); } if (highScore > 0) { ctx.textAlign = 'center'; ctx.fillText("HI:" + highScore.toString().padStart(6, '0'), GAME_WIDTH / 2, 10); } }
+        function drawTetrisBlockAbsolute(x, y, colorIndex) { const color = GB_COLORS[colorIndex]; const lightColor = GB_COLORS[Math.min(3, colorIndex + 1)]; const darkColor = GB_COLORS[Math.max(0, colorIndex - 1)]; ctx.fillStyle = color; ctx.fillRect(x, y, TETRIS_BLOCK_SIZE, TETRIS_BLOCK_SIZE); ctx.fillStyle = lightColor; ctx.fillRect(x, y, TETRIS_BLOCK_SIZE, 1); ctx.fillRect(x, y, 1, TETRIS_BLOCK_SIZE); ctx.fillStyle = darkColor; ctx.fillRect(x, y + TETRIS_BLOCK_SIZE - 1, TETRIS_BLOCK_SIZE, 1); ctx.fillRect(x + TETRIS_BLOCK_SIZE - 1, y, 1, TETRIS_BLOCK_SIZE); }
+        function drawTetrisBlock(boardX, boardY, colorIndex) { if (boardY < 0) return; const x = TETRIS_BOARD_X + boardX * TETRIS_BLOCK_SIZE; const y = TETRIS_BOARD_Y + boardY * TETRIS_BLOCK_SIZE; drawTetrisBlockAbsolute(x, y, colorIndex); }
+        function initSnake() { console.log("Initializing Snake..."); updateGBColors(); activeGame = 'snake'; currentGameState = 'SNAKE'; score = 0; level = 1; snake = [{ x: Math.floor(SNAKE_BOARD_WIDTH / 2), y: Math.floor(SNAKE_BOARD_HEIGHT / 2) }]; snakeDirection = { x: 1, y: 0 }; nextDirection = { x: 1, y: 0 }; food = generateFood(); snakeSpeed = 200; lastMoveTime = performance.now(); snakeGameOver = false; gamePaused = false; loadHighScore(); removeLoadingPlaceholder(); canvas.style.display = 'block'; showToast('Snake Iniciado!'); updateMusicState(); startGameLoop(); console.log("Snake Initialized. Canvas visible:", canvas.style.display); }
+        function updateSnake(deltaTime) { if (gamePaused || snakeGameOver) return; handleKeyRepeat(); lastMoveTime += deltaTime; if (lastMoveTime >= snakeSpeed) { lastMoveTime %= snakeSpeed; snakeDirection = { ...nextDirection }; const head = { x: snake[0].x + snakeDirection.x, y: snake[0].y + snakeDirection.y }; if (head.x < 0 || head.x >= SNAKE_BOARD_WIDTH || head.y < 0 || head.y >= SNAKE_BOARD_HEIGHT) { snakeGameOver = true; soundEffects.snakeDie(); return endGame(); } for (let i = 1; i < snake.length; i++) { if (snake[i].x === head.x && snake[i].y === head.y) { snakeGameOver = true; soundEffects.snakeDie(); return endGame(); } } snake.unshift(head); if (head.x === food.x && head.y === food.y) { score += 10; soundEffects.snakeEat(); food = generateFood(); if (score > 0 && score % 50 === 0 && snakeSpeed > 80) snakeSpeed = Math.max(80, snakeSpeed - 10); updateHighScore(); } else { snake.pop(); } finalScoreElement.textContent = score; pauseScoreElement.textContent = score; } }
+        function drawSnake() { if (currentGameState !== 'SNAKE' && !(currentGameState === 'PAUSED' && activeGame === 'snake')) return; ctx.fillStyle = GB_COLORS.BG; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); ctx.fillStyle = GB_COLORS[0]; for (let part of snake) { ctx.fillRect(part.x * SNAKE_BLOCK_SIZE, part.y * SNAKE_BLOCK_SIZE, SNAKE_BLOCK_SIZE, SNAKE_BLOCK_SIZE); } if (food) { ctx.fillStyle = GB_COLORS[1]; ctx.fillRect(food.x * SNAKE_BLOCK_SIZE, food.y * SNAKE_BLOCK_SIZE, SNAKE_BLOCK_SIZE, SNAKE_BLOCK_SIZE); } ctx.fillStyle = GB_COLORS.TEXT; ctx.font = "8px monospace, sans-serif"; ctx.textAlign = "left"; ctx.fillText("SCORE:" + score.toString().padStart(4, '0'), 5, 10); if (highScore > 0) { ctx.textAlign = 'right'; ctx.fillText("HI:" + highScore.toString().padStart(4, '0'), GAME_WIDTH - 5, 10); } }
+        function resetSnake() { snake = []; food = null; snakeDirection = { x: 1, y: 0 }; nextDirection = { x: 1, y: 0 }; snakeSpeed = 200; snakeGameOver = false; console.log("Snake reset"); }
+        function generateFood() { let newFood; while (true) { newFood = { x: Math.floor(Math.random() * SNAKE_BOARD_WIDTH), y: Math.floor(Math.random() * SNAKE_BOARD_HEIGHT) }; if (!snake.some(part => part.x === newFood.x && part.y === newFood.y)) break; } return newFood; }
+        function initPlatformer() { console.log("Initializing Platformer..."); updateGBColors(); activeGame = 'platformer'; currentGameState = 'PLATFORMER'; score = 0; level = 1; platformerMap = []; collectibles = []; goal = null; platformerGameOver = false; platformerWin = false; gamePaused = false; loadHighScore(); for (let y = 0; y < level1Map.length; y++) { for (let x = 0; x < level1Map[y].length; x++) { const tileX = x * PLATFORMER_TILE_SIZE; const tileY = y * PLATFORMER_TILE_SIZE; const tileType = level1Map[y][x]; if (tileType === '1') { platformerMap.push({ x: tileX, y: tileY, width: PLATFORMER_TILE_SIZE, height: PLATFORMER_TILE_SIZE }); } else if (tileType === '2') { player.x = tileX; player.y = tileY; player.vx = 0; player.vy = 0; player.onGround = false; } else if (tileType === '3') { collectibles.push({ x: tileX + PLATFORMER_TILE_SIZE/4, y: tileY + PLATFORMER_TILE_SIZE/4, width: PLATFORMER_TILE_SIZE/2, height: PLATFORMER_TILE_SIZE/2, collected: false }); } else if (tileType === '4') { goal = { x: tileX, y: tileY, width: PLATFORMER_TILE_SIZE, height: PLATFORMER_TILE_SIZE }; } } } removeLoadingPlaceholder(); canvas.style.display = 'block'; showToast('Platformer Iniciado!'); lastTime = performance.now(); updateMusicState(); startGameLoop(); console.log("Platformer Initialized. Canvas visible:", canvas.style.display); }
+        function updatePlatformer(deltaTime) { if (gamePaused || platformerGameOver || platformerWin) return; handleKeyRepeat(); player.vx = 0; if (keys.left) player.vx = -PLATFORMER_PLAYER_SPEED; if (keys.right) player.vx = PLATFORMER_PLAYER_SPEED; player.x += player.vx; player.onGround = false; platformerMap.forEach(platform => { if (checkSimpleCollision(player, platform)) { if (player.vx > 0) { player.x = platform.x - player.width; } else if (player.vx < 0) { player.x = platform.x + platform.width; } player.vx = 0; } }); player.vy += PLATFORMER_GRAVITY; player.y += player.vy; let landedSoundPlayed = false; platformerMap.forEach(platform => { if (checkSimpleCollision(player, platform)) { if (player.vy > 0) { player.y = platform.y - player.height; player.vy = 0; if (!player.onGround) { if(!landedSoundPlayed) { soundEffects.land(0.08); landedSoundPlayed = true; } } player.onGround = true; } else if (player.vy < 0) { player.y = platform.y + platform.height; player.vy = 0; } } }); collectibles.forEach(coin => { if (!coin.collected && checkSimpleCollision(player, coin)) { coin.collected = true; score += 50; soundEffects.coin(); updateHighScore(); finalScoreElement.textContent = score; pauseScoreElement.textContent = score; } }); if (goal && checkSimpleCollision(player, goal)) { platformerWin = true; soundEffects.win(); showToast("Nível Concluído!", 2500); setTimeout(endGame, 1000); } if (player.y > GAME_HEIGHT) { platformerGameOver = true; soundEffects.hurt(); endGame(); } }
+        function drawPlatformer() { if (currentGameState !== 'PLATFORMER' && !(currentGameState === 'PAUSED' && activeGame === 'platformer')) return; ctx.fillStyle = GB_COLORS.BG; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); ctx.fillStyle = GB_COLORS.PLATFORM; platformerMap.forEach(platform => { ctx.fillRect(platform.x, platform.y, platform.width, platform.height); }); ctx.fillStyle = GB_COLORS.COLLECTIBLE; collectibles.forEach(coin => { if (!coin.collected) ctx.fillRect(coin.x, coin.y, coin.width, coin.height); }); if (goal) { ctx.fillStyle = GB_COLORS.GOAL; ctx.fillRect(goal.x, goal.y, goal.width, goal.height); ctx.fillStyle = GB_COLORS[0]; ctx.fillRect(goal.x + goal.width / 2 - 1, goal.y - goal.height, 2, goal.height); ctx.fillStyle = GB_COLORS[1]; ctx.beginPath(); ctx.moveTo(goal.x + goal.width / 2 + 1, goal.y - goal.height + 2); ctx.lineTo(goal.x + goal.width - 2, goal.y - goal.height / 2); ctx.lineTo(goal.x + goal.width / 2 + 1, goal.y - 2); ctx.fill(); } ctx.fillStyle = GB_COLORS.PLAYER; ctx.fillRect(player.x, player.y, player.width, player.height); ctx.fillStyle = GB_COLORS.TEXT; ctx.font = "8px monospace, sans-serif"; ctx.textAlign = "left"; ctx.fillText("SCORE:" + score.toString().padStart(4, '0'), 5, 10); if (highScore > 0) { ctx.textAlign = 'right'; ctx.fillText("HI:" + highScore.toString().padStart(4, '0'), GAME_WIDTH - 5, 10); } }
+        function resetPlatformer() { platformerMap = []; collectibles = []; player = { x: 0, y: 0, width: PLATFORMER_TILE_SIZE, height: PLATFORMER_TILE_SIZE, vx: 0, vy: 0, onGround: false }; goal = null; platformerGameOver = false; platformerWin = false; console.log("Platformer reset"); }
+        function playerJump() { if (player.onGround) { player.vy = PLATFORMER_JUMP_FORCE; player.onGround = false; soundEffects.jump(); } }
+        function createBricks() { bricks = []; for (let c = 0; c < BRICK_COLS; c++) { for (let r = 0; r < BRICK_ROWS; r++) { bricks.push({ x: BRICK_OFFSET_LEFT + c * (BRICK_WIDTH + BRICK_PADDING), y: BRICK_OFFSET_TOP + r * (BRICK_HEIGHT + BRICK_PADDING), width: BRICK_WIDTH, height: BRICK_HEIGHT, colorIndex: (r % 2 === 0) ? 2 : 1, visible: true }); } } }
+        function resetBallAndPaddle() { ballIsMoving = false; paddle.x = GAME_WIDTH / 2 - PADDLE_WIDTH / 2; paddle.y = GAME_HEIGHT - PADDLE_HEIGHT - 5; ball.x = paddle.x + paddle.width / 2; ball.y = paddle.y - ball.radius - 1; ball.vx = 0; ball.vy = 0; }
+        function launchBall() { if (!ballIsMoving && lives > 0) { ballIsMoving = true; ball.vx = BALL_SPEED * (Math.random() < 0.5 ? 1 : -1); ball.vy = -BALL_SPEED; soundEffects.buttonClick(); } }
+        function initBreakout() { console.log("Initializing Breakout..."); updateGBColors(); activeGame = 'breakout'; currentGameState = 'BREAKOUT'; score = 0; level = 1; lives = INITIAL_LIVES; breakoutGameOver = false; breakoutLevelComplete = false; ballIsMoving = false; loadHighScore(); createBricks(); resetBallAndPaddle(); removeLoadingPlaceholder(); canvas.style.display = 'block'; showToast('Breakout Iniciado!'); lastTime = performance.now(); updateMusicState(); startGameLoop(); console.log("Breakout Initialized. Canvas visible:", canvas.style.display); }
+        function resetBreakout() { bricks = []; breakoutGameOver = false; breakoutLevelComplete = false; ballIsMoving = false; console.log("Breakout reset"); }
+        function updateBreakout(deltaTime) { if (gamePaused || breakoutGameOver || breakoutLevelComplete) return; handleKeyRepeat(); if (keys.left && paddle.x > 0) { paddle.x -= PADDLE_SPEED; } if (keys.right && paddle.x < GAME_WIDTH - paddle.width) { paddle.x += PADDLE_SPEED; } if (ballIsMoving) { ball.x += ball.vx; ball.y += ball.vy; if (ball.x + ball.radius > GAME_WIDTH || ball.x - ball.radius < 0) { ball.vx = -ball.vx; soundEffects.wallHit(0.08); ball.x = Math.max(ball.radius, Math.min(GAME_WIDTH - ball.radius, ball.x)); } if (ball.y - ball.radius < 0) { ball.vy = -ball.vy; soundEffects.wallHit(0.08); ball.y = ball.radius; } if (ball.y + ball.radius > GAME_HEIGHT) { lives--; soundEffects.loseLife(); if (lives <= 0) { breakoutGameOver = true; endGame(); } else { resetBallAndPaddle(); showToast(`Vidas: ${lives}`, 1000); } return; } if (ball.y + ball.radius > paddle.y && ball.y - ball.radius < paddle.y + paddle.height && ball.x + ball.radius > paddle.x && ball.x - ball.radius < paddle.x + paddle.width) { if (ball.vy > 0) { ball.vy = -ball.vy; let deltaX = ball.x - (paddle.x + paddle.width / 2); ball.vx = deltaX * 0.1; ball.vx = Math.max(-BALL_SPEED * 1.2, Math.min(BALL_SPEED * 1.2, ball.vx)); ball.y = paddle.y - ball.radius; soundEffects.paddleHit(); } } for (let i = bricks.length - 1; i >= 0; i--) { const b = bricks[i]; if (b.visible && checkSimpleCollision({ x: ball.x - ball.radius, y: ball.y - ball.radius, width: ball.radius * 2, height: ball.radius * 2 }, b)) { ball.vy = -ball.vy; b.visible = false; score += 10; soundEffects.brickBreak(); updateHighScore(); finalScoreElement.textContent = score; pauseScoreElement.textContent = score; break; } } if (bricks.every(b => !b.visible)) { breakoutLevelComplete = true; soundEffects.win(); showToast("Nível Limpo!", 2000); setTimeout(() => { createBricks(); resetBallAndPaddle(); breakoutLevelComplete = false; }, 1500); } } else { ball.x = paddle.x + paddle.width / 2; ball.y = paddle.y - ball.radius -1; } }
+        function drawBreakout() { if (currentGameState !== 'BREAKOUT' && !(currentGameState === 'PAUSED' && activeGame === 'breakout')) return; ctx.fillStyle = GB_COLORS.BG; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); ctx.fillStyle = GB_COLORS.PADDLE; ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height); ctx.fillStyle = GB_COLORS.BALL; ctx.fillRect(ball.x - ball.radius, ball.y - ball.radius, ball.radius * 2, ball.radius * 2); bricks.forEach(brick => { if (brick.visible) { ctx.fillStyle = GB_COLORS[`BRICK${brick.colorIndex}`]; ctx.fillRect(brick.x, brick.y, brick.width, brick.height); } }); ctx.fillStyle = GB_COLORS.TEXT; ctx.font = "8px monospace, sans-serif"; ctx.textAlign = "left"; ctx.fillText("SCORE:" + score.toString().padStart(6, '0'), 5, 10); if (highScore > 0) { ctx.textAlign = 'right'; ctx.fillText("HI:" + highScore.toString().padStart(6, '0'), GAME_WIDTH - 5 - 30, 10); } ctx.textAlign = 'right'; ctx.fillText("LIFE:", GAME_WIDTH - 5 - 8, 10); ctx.fillStyle = GB_COLORS.PADDLE; for (let i = 0; i < lives; i++) { ctx.fillRect(GAME_WIDTH - 5 - (i * 6), 4, 4, 4); } }
+        function showMenu() {
+            currentGameState = 'MENU';
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            pauseScreen.style.display = 'none';
+            canvas.style.display = 'none';
+            removeLoadingPlaceholder();
+            gameSelectionScreen.style.display = 'flex';
+            selectedGameIndex = 0;
+            updateMenuSelection();
+            soundEffects.buttonClick();
+            if (activeGame === 'tetris') resetTetris();
+            if (activeGame === 'snake') resetSnake();
+            if (activeGame === 'platformer') resetPlatformer();
+            if (activeGame === 'breakout') resetBreakout();
+            activeGame = null;
+            stopGameLoop();
+            updateMusicState();
+        }
+        function updateMenuSelection() { gameOptions.forEach((option, index) => { option.classList.toggle('selected', index === selectedGameIndex); }); }
+        function loadSelectedGame() {
+            if (currentGameState !== 'MENU') return;
+            const selectedOption = gameOptions[selectedGameIndex];
+            const gameId = selectedOption.dataset.game;
+            currentGameState = 'LOADING';
+            updateMusicState();
+            gameSelectionScreen.style.display = 'none';
+            showLoadingPlaceholder(`Loading ${gameId.toUpperCase()}...`);
+            soundEffects.start();
+            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+            stopGameLoop();
+            setTimeout(() => {
+                console.log(`Attempting to load game: ${gameId}`);
+                score = 0; level = 1; linesCleared = 0; gamePaused = false; highScore = 0;
+                tetrisGameOver = false; snakeGameOver = false; platformerGameOver = false;
+                platformerWin = false; breakoutGameOver = false; breakoutLevelComplete = false;
+                try {
+                    if (gameId === 'tetris') initTetris();
+                    else if (gameId === 'snake') initSnake();
+                    else if (gameId === 'platformer') initPlatformer();
+                    else if (gameId === 'breakout') initBreakout();
+                    else { throw new Error(`Jogo desconhecido: ${gameId}`); }
+                } catch (error) {
+                    console.error("Erro ao carregar o jogo:", error);
+                    showToast(`Erro: Não foi possível carregar ${gameId}.`);
+                    currentGameState = 'MENU';
+                    updateMusicState();
+                    showMenu();
+                }
+            }, 50);
+        }
+        function showLoadingPlaceholder(message) { loadingPlaceholder.textContent = message; loadingPlaceholder.style.display = 'flex'; canvas.style.display = 'none'; }
+        function removeLoadingPlaceholder() { loadingPlaceholder.style.display = 'none'; }
+        function togglePause() {
+            const pausableStates = ['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT'];
+            if (pausableStates.includes(currentGameState)) {
+                gamePaused = true;
+                currentGameState = 'PAUSED';
+                pauseScoreElement.textContent = score;
+                soundEffects.pause();
+                updateMusicState();
+                stopGameLoop();
+            } else if (currentGameState === 'PAUSED') {
+                gamePaused = false;
+                currentGameState = activeGame.toUpperCase();
+                pauseScreen.style.display = 'none';
+                soundEffects.buttonClick();
+                showToast('Jogo Retomado');
+                lastTime = performance.now();
+                lastMoveTime = performance.now();
+                updateMusicState();
+                startGameLoop();
+            }
+        }
+        function endGame() {
+            const gameOverStates = ['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT'];
+            if (gameOverStates.includes(currentGameState) || currentGameState === 'PAUSED') {
+                console.log(`Game Over triggered for ${activeGame}. Current state: ${currentGameState}`);
+                const wasPaused = gamePaused;
+                gamePaused = false;
+                const previousState = currentGameState;
+                currentGameState = 'GAMEOVER';
+                finalScoreElement.textContent = score;
+                updateHighScore();
+                gameOverScreen.style.display = 'flex';
+                canvas.style.display = 'none';
+                removeLoadingPlaceholder();
+                pauseScreen.style.display = 'none';
+                if (previousState !== 'GAMEOVER' && !platformerWin) {
+                    soundEffects.gameOver();
+                }
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                if (activeGame === 'tetris') resetTetris();
+                else if (activeGame === 'snake') resetSnake();
+                else if (activeGame === 'platformer') resetPlatformer();
+                else if (activeGame === 'breakout') resetBreakout();
+                activeGame = null;
+                updateMusicState();
+                stopGameLoop();
+                console.log("Game loop stopped on game over.");
+            } else {
+                console.warn(`endGame called from unexpected state: ${currentGameState}`);
+            }
+        }
+        function returnToMenu() {
+            gameOverScreen.style.display = 'none';
+            pauseScreen.style.display = 'none';
+            stopGameLoop();
+            showMenu();
+        }
+        function loadHighScore() { if (!activeGame) return; let highScoreKey = `gb-highscore-${activeGame}`; highScore = parseInt(localStorage.getItem(highScoreKey) || '0', 10); console.log(`Loaded high score for ${activeGame}: ${highScore}`); }
+        function updateHighScore() { if (!activeGame) return; let highScoreKey = `gb-highscore-${activeGame}`; let currentHighScore = parseInt(localStorage.getItem(highScoreKey) || '0', 10); if (score > currentHighScore) { highScore = score; localStorage.setItem(highScoreKey, highScore); console.log(`New high score for ${activeGame}: ${highScore}`); return true; } return false; }
+        function checkSimpleCollision(rect1, rect2) { return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x && rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y; }
+        function setupInputControls() {
+            const setupButton = (button, key, actionFn = null, repeat = false) => {
+                 const startHandler = (e) => { e.preventDefault(); if (e.type === 'mousedown' && e.button !== 0) return; if (!keys[key]) { keys[key] = true; button.classList.add('active'); if (actionFn) actionFn(); if (repeat) startKeyRepeat(key, actionFn); else if (actionFn && !(key === 'left' || key === 'right')) { const noSoundStates = ['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT']; if (!noSoundStates.includes(currentGameState) || (key !== 'left' && key !== 'right')) { soundEffects.buttonClick(); } } } };
+                 const endHandler = (e) => { e.preventDefault(); if (keys[key]) { keys[key] = false; button.classList.remove('active'); stopKeyRepeat(key); } };
+                 button.addEventListener('touchstart', startHandler, { passive: false }); button.addEventListener('touchend', endHandler); button.addEventListener('touchcancel', endHandler); button.addEventListener('mousedown', startHandler); button.addEventListener('mouseup', endHandler); button.addEventListener('mouseleave', endHandler);
+             };
+            setupButton(btnUp, 'up', handleDPadUp); setupButton(btnDown, 'down', handleDPadDown, true); setupButton(btnLeft, 'left', handleDPadLeft, true); setupButton(btnRight, 'right', handleDPadRight, true);
+            setupButton(btnA, 'a', handleButtonA); setupButton(btnB, 'b', handleButtonB); setupButton(btnSelect, 'select', handleSelectButton);
+            btnStart.addEventListener('touchstart', (e) => { e.preventDefault(); if (!keys.start) { keys.start = true; handleStartButton(); btnStart.classList.add('active'); } }, { passive: false });
+            btnStart.addEventListener('touchend', (e) => { e.preventDefault(); if (keys.start) { keys.start = false; btnStart.classList.remove('active'); } });
+            btnStart.addEventListener('touchcancel', (e) => { e.preventDefault(); if (keys.start) { keys.start = false; btnStart.classList.remove('active'); } });
+            btnStart.addEventListener('mousedown', (e) => { if(e.button === 0 && !keys.start) { keys.start = true; handleStartButton(); btnStart.classList.add('active'); }});
+            btnStart.addEventListener('mouseup', (e) => { if(e.button === 0 && keys.start) { keys.start = false; btnStart.classList.remove('active'); }});
+            btnStart.addEventListener('mouseleave', (e) => { if (keys.start) { keys.start = false; btnStart.classList.remove('active'); } });
+            gameWrapper.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+        }
+        function setupKeyboardControls() {
+             document.addEventListener('keydown', (e) => {
+                 let keyName = e.key.toLowerCase(); let buttonToActivate = null; let actionFn = null; let repeat = false; let skipDefaultPrevent = e.target.matches('input, textarea, select');
+                 if (!skipDefaultPrevent) { const gameKeys = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'z', 'x', ' ', 'enter', 'shift', 'a', 's', 'd', 'w', 'k', 'l', 'p', 'c', 't', 'v']; if (gameKeys.includes(keyName)) e.preventDefault(); }
+                 if (e.repeat && [' ', 'enter', 'shift', 'z', 'x', 'k', 'l', 'arrowup', 'w', 'p'].includes(keyName)) return;
+                 let currentKey = null;
+                 switch(keyName) {
+                     case 'arrowleft': case 'a': currentKey = 'left'; break;
+                     case 'arrowright': case 'd': currentKey = 'right'; break;
+                     case 'arrowup': case 'w': currentKey = 'up'; break;
+                     case 'arrowdown': case 's': currentKey = 'down'; break;
+                     case 'z': case 'k': case ' ': currentKey = 'a'; break;
+                     case 'x': case 'l': currentKey = 'b'; break;
+                     case 'enter': currentKey = 'start'; break;
+                     case 'shift': currentKey = 'select'; break;
+                     case 'c': contrastToggle.click(); return; case 't': textSizeToggle.click(); return; case 'v': viewToggle.click(); return;
+                     case 'p': if(!keys.start) { const pausableStates = ['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT', 'PAUSED']; if(pausableStates.includes(currentGameState)) { keys.start = true; handleStartButton(); btnStart.classList.add('active'); } } return;
+                     default: return;
+                 }
+                 if (currentKey && !keys[currentKey]) {
+                     keys[currentKey] = true;
+                     switch(currentKey) {
+                         case 'left': buttonToActivate = btnLeft; actionFn = handleDPadLeft; repeat = true; break;
+                         case 'right': buttonToActivate = btnRight; actionFn = handleDPadRight; repeat = true; break;
+                         case 'up': buttonToActivate = btnUp; actionFn = handleDPadUp; break;
+                         case 'down': buttonToActivate = btnDown; actionFn = handleDPadDown; repeat = true; break;
+                         case 'a': buttonToActivate = btnA; actionFn = handleButtonA; break;
+                         case 'b': buttonToActivate = btnB; actionFn = handleButtonB; break;
+                         case 'start': buttonToActivate = btnStart; actionFn = handleStartButton; break;
+                         case 'select': buttonToActivate = btnSelect; actionFn = handleSelectButton; break;
+                     }
+                     if (actionFn) {
+                        if (buttonToActivate) buttonToActivate.classList.add('active');
+                        actionFn();
+                        if (repeat) { startKeyRepeat(currentKey, actionFn); }
+                     }
+                 }
+             });
+             document.addEventListener('keyup', (e) => {
+                 let keyName = e.key.toLowerCase(); let buttonToDeactivate = null; let currentKey = null;
+                 switch(keyName) {
+                     case 'arrowleft': case 'a': currentKey = 'left'; break;
+                     case 'arrowright': case 'd': currentKey = 'right'; break;
+                     case 'arrowup': case 'w': currentKey = 'up'; break;
+                     case 'arrowdown': case 's': currentKey = 'down'; break;
+                     case 'z': case 'k': case ' ': currentKey = 'a'; break;
+                     case 'x': case 'l': currentKey = 'b'; break;
+                     case 'enter': currentKey = 'start'; break;
+                     case 'shift': currentKey = 'select'; break;
+                     case 'p': currentKey = 'start'; break;
+                     default: return;
+                 }
+                 if (currentKey && keys[currentKey]) {
+                    keys[currentKey] = false;
+                    switch(currentKey) {
+                        case 'left': buttonToDeactivate = btnLeft; break;
+                        case 'right': buttonToDeactivate = btnRight; break;
+                        case 'up': buttonToDeactivate = btnUp; break;
+                        case 'down': buttonToDeactivate = btnDown; break;
+                        case 'a': buttonToDeactivate = btnA; break;
+                        case 'b': buttonToDeactivate = btnB; break;
+                        case 'start': buttonToDeactivate = btnStart; break;
+                        case 'select': buttonToDeactivate = btnSelect; break;
+                    }
+                    if (buttonToDeactivate) buttonToDeactivate.classList.remove('active');
+                    stopKeyRepeat(currentKey);
+                 }
+             });
+        }
+        function startKeyRepeat(key, actionFn) {
+            if (keyHeld.key !== null) { stopKeyRepeat(keyHeld.key); }
+            keyHeld.key = key;
+            keyHeld.timer = setTimeout(() => {
+                keyHeld.interval = setInterval(() => {
+                    const canRepeat = keys[keyHeld.key] && !gamePaused && currentGameState !== 'GAMEOVER' && currentGameState !== 'PAUSED';
+                    if (canRepeat && actionFn) { actionFn(); } else { stopKeyRepeat(keyHeld.key); }
+                }, keyRepeatInterval);
+            }, keyRepeatDelay);
+        }
+        function stopKeyRepeat(key) {
+             if (key === null || keyHeld.key === key) {
+                 if (keyHeld.timer) clearTimeout(keyHeld.timer);
+                 if (keyHeld.interval) clearInterval(keyHeld.interval);
+                 keyHeld = { key: null, timer: null, interval: null };
+             }
+        }
+        function handleKeyRepeat() { }
+        function handleDPadUp() {
+             if (currentGameState === 'MENU') { selectedGameIndex = (selectedGameIndex - 1 + gameOptions.length) % gameOptions.length; updateMenuSelection(); soundEffects.buttonClick(); }
+             else if (currentGameState === 'TETRIS' && !gamePaused && !tetrisGameOver) { pieceRotate(1); }
+             else if (currentGameState === 'SNAKE' && !gamePaused && !snakeGameOver) { if (snakeDirection.y === 0) nextDirection = { x: 0, y: -1 }; }
+             else if (currentGameState === 'PLATFORMER' && !gamePaused && !platformerGameOver) { playerJump(); }
+             else if (currentGameState === 'BREAKOUT' && !gamePaused && !breakoutGameOver) { launchBall(); }
+             else if (currentGameState === 'TITLE') { }
+        }
+        function handleDPadDown() {
+             if (gamePaused || currentGameState === 'TITLE' || currentGameState === 'PLATFORMER' || currentGameState === 'BREAKOUT') return;
+             if (currentGameState === 'MENU') { selectedGameIndex = (selectedGameIndex + 1) % gameOptions.length; updateMenuSelection(); soundEffects.buttonClick(); }
+             else if (currentGameState === 'TETRIS' && !tetrisGameOver) { pieceDrop(); dropCounter = 0; }
+             else if (currentGameState === 'SNAKE' && !snakeGameOver) { if (snakeDirection.y === 0) nextDirection = { x: 0, y: 1 }; }
+        }
+        function handleDPadLeft() {
+             if (gamePaused || currentGameState === 'TITLE' || currentGameState === 'MENU') return;
+             if (currentGameState === 'TETRIS' && !tetrisGameOver) { pieceMove(-1); }
+             else if (currentGameState === 'SNAKE' && !snakeGameOver) { if (snakeDirection.x === 0) nextDirection = { x: -1, y: 0 }; }
+        }
+        function handleDPadRight() {
+             if (gamePaused || currentGameState === 'TITLE' || currentGameState === 'MENU') return;
+             if (currentGameState === 'TETRIS' && !tetrisGameOver) { pieceMove(1); }
+             else if (currentGameState === 'SNAKE' && !snakeGameOver) { if (snakeDirection.x === 0) nextDirection = { x: 1, y: 0 }; }
+        }
+        function handleButtonA() {
+             if (gamePaused || currentGameState === 'TITLE' || currentGameState === 'MENU' || currentGameState === 'SNAKE') { if (!gamePaused) soundEffects.buttonClick(); return; }
+             if (currentGameState === 'TETRIS' && !tetrisGameOver) { pieceRotate(1); }
+             else if (currentGameState === 'PLATFORMER' && !platformerGameOver) { playerJump(); }
+             else if (currentGameState === 'BREAKOUT' && !breakoutGameOver) { launchBall(); }
+        }
+        function handleButtonB() {
+             if (gamePaused || currentGameState === 'TITLE' || currentGameState === 'MENU' || currentGameState === 'SNAKE' || currentGameState === 'PLATFORMER') { if (!gamePaused) soundEffects.buttonClick(); return; }
+             if (currentGameState === 'TETRIS' && !tetrisGameOver) { pieceRotate(-1); }
+             else if (currentGameState === 'BREAKOUT' && !breakoutGameOver) { launchBall(); }
+        }
+        function handleStartButton() {
+             if (currentGameState === 'TITLE') { showMenu(); }
+             else if (currentGameState === 'MENU') { loadSelectedGame(); }
+             else if (currentGameState === 'GAMEOVER') { returnToMenu(); }
+             else if (['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT', 'PAUSED'].includes(currentGameState)) { togglePause(); }
+        }
+        function handleSelectButton() {
+             soundEffects.buttonClick();
+             const activeGameStates = ['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT', 'PAUSED'];
+             if (activeGameStates.includes(currentGameState)) {
+                 showToast('Voltando ao Menu...', 1000);
+                 setTimeout(returnToMenu, 300);
+             }
+             else if (currentGameState === 'MENU' || currentGameState === 'TITLE' || currentGameState === 'GAMEOVER') {
+                 viewToggle.click();
+             }
+        }
+        function startGameLoop() { if (!animationFrameId) { console.log("Starting game loop..."); lastTime = performance.now(); animationFrameId = requestAnimationFrame(gameLoop); } }
+        function stopGameLoop() { if (animationFrameId) { console.log("Stopping game loop..."); cancelAnimationFrame(animationFrameId); animationFrameId = null; } }
+        function gameLoop(timestamp) {
+             const deltaTime = timestamp - lastTime; lastTime = timestamp;
+             const activeGameStates = ['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT'];
+             if (!gamePaused && activeGameStates.includes(currentGameState)) {
+                 switch (currentGameState) {
+                     case 'TETRIS': updateTetris(deltaTime); break;
+                     case 'SNAKE': updateSnake(deltaTime); break;
+                     case 'PLATFORMER': updatePlatformer(deltaTime); break;
+                     case 'BREAKOUT': updateBreakout(deltaTime); break;
+                 }
+             }
+             const gameVisible = activeGameStates.includes(currentGameState) || currentGameState === 'PAUSED';
+             if (canvas.style.display === 'block' && gameVisible) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                 switch (activeGame) {
+                     case 'tetris': drawTetris(); break;
+                     case 'snake': drawSnake(); break;
+                     case 'platformer': drawPlatformer(); break;
+                     case 'breakout': drawBreakout(); break;
+                 }
+                 if (gamePaused && currentGameState === 'PAUSED') {
+                     ctx.fillStyle = 'rgba(15, 56, 15, 0.7)'; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                     ctx.fillStyle = GB_COLORS.BG; ctx.font = '16px "PressStart2P", monospace, sans-serif'; ctx.textAlign = 'center';
+                     ctx.fillText("PAUSED", GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10);
+                     ctx.font = "8px monospace, sans-serif"; ctx.fillText("SCORE:" + score, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10);
+                     ctx.fillText("Press Start", GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30); ctx.textAlign = 'left';
+                 }
+             } else if (currentGameState === 'LOADING') {
+                if (canvas.style.display !== 'none') canvas.style.display = 'none';
+             } else if (currentGameState === 'TITLE' || currentGameState === 'MENU' || currentGameState === 'GAMEOVER') {
+                if (canvas.style.display !== 'none') canvas.style.display = 'none';
+             }
+             if (animationFrameId) {
+                 animationFrameId = requestAnimationFrame(gameLoop);
+             }
+        }
+        function resizeCanvas() {
+             const gameScreen = document.getElementById('game-screen'); if (!gameScreen) return;
+             updateGBColors();
+             const screenWidth = gameScreen.clientWidth; const screenHeight = gameScreen.clientHeight;
+             canvas.width = GAME_WIDTH; canvas.height = GAME_HEIGHT; const scaleX = screenWidth / GAME_WIDTH; const scaleY = screenHeight / GAME_HEIGHT;
+             const scale = Math.max(1, Math.floor(Math.min(scaleX, scaleY))); const canvasWidth = GAME_WIDTH * scale; const canvasHeight = GAME_HEIGHT * scale;
+             canvas.style.width = canvasWidth + 'px'; canvas.style.height = canvasHeight + 'px'; canvas.style.position = 'absolute';
+             canvas.style.left = Math.floor((screenWidth - canvasWidth) / 2) + 'px'; canvas.style.top = Math.floor((screenHeight - canvasHeight) / 2) + 'px';
+             ctx.imageSmoothingEnabled = false;
+              const activeGameStates = ['TETRIS', 'SNAKE', 'PLATFORMER', 'BREAKOUT', 'PAUSED'];
+              if (canvas.style.display === 'block' && activeGameStates.includes(currentGameState)) {
+                    console.log("Redrawing after resize for state:", currentGameState); ctx.clearRect(0, 0, canvas.width, canvas.height);
+                     switch (activeGame) { case 'tetris': drawTetris(); break; case 'snake': drawSnake(); break; case 'platformer': drawPlatformer(); break; case 'breakout': drawBreakout(); break; }
+                    if (gamePaused && currentGameState === 'PAUSED') { ctx.fillStyle = 'rgba(15, 56, 15, 0.7)'; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); ctx.fillStyle = GB_COLORS.BG; ctx.font = '16px "PressStart2P", monospace, sans-serif'; ctx.textAlign = 'center'; ctx.fillText("PAUSED", GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10); ctx.font = "8px monospace, sans-serif"; ctx.fillText("SCORE:" + score, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10); ctx.fillText("Press Start", GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30); ctx.textAlign = 'left'; }
+               }
+         }
+        function init() {
+            console.log("Initializing Application...");
+            updateGBColors();
+            createGameBoyDetails();
+            setupInputControls();
+            setupKeyboardControls();
+            gameOptions = document.querySelectorAll('#game-list .game-option');
+            updateMenuSelection();
+            contrastToggle.addEventListener('click', () => { soundEffects.buttonClick(); document.body.classList.toggle('high-contrast'); showToast(document.body.classList.contains('high-contrast') ? 'Alto contraste Ativado' : 'Alto contraste Desativado'); resizeCanvas(); updateGBColors(); });
+            textSizeToggle.addEventListener('click', () => { soundEffects.buttonClick(); document.body.classList.toggle('large-text'); showToast(document.body.classList.contains('large-text') ? 'Texto Grande Ativado' : 'Texto Grande Desativado'); resizeCanvas(); });
+            viewToggle.addEventListener('click', () => { soundEffects.buttonClick(); const isGameBoyMode = gameWrapper.classList.contains('gameboy-mode'); gameWrapper.classList.toggle('gameboy-mode', !isGameBoyMode); gameWrapper.classList.toggle('canvas-mode', isGameBoyMode); viewToggle.textContent = isGameBoyMode ? 'Modo Tela Cheia' : 'Modo Game Boy'; showToast(isGameBoyMode ? 'Modo Tela Cheia Ativado' : 'Modo Game Boy Ativado'); setTimeout(resizeCanvas, 50); });
+            currentGameState = 'TITLE';
+            startScreen.style.display = 'flex';
+            canvas.style.display = 'none';
+            gameSelectionScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            pauseScreen.style.display = 'none';
+            loadingPlaceholder.style.display = 'none';
+            powerLed.classList.add('on');
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            stopGameLoop();
+            updateMusicState();
+            const initialInteraction = () => {
+                console.log("Initial interaction detected.");
+                const audioCtx = getAudioContext();
+                if(audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(() => {
+                        console.log("AudioContext resumed successfully.");
+                        updateMusicState();
+                    }).catch(e => console.error("AudioContext resume failed:", e));
+                }
+                if (menuMusic.paused) {
+                    menuMusic.play().then(() => menuMusic.pause()).catch(()=>{});
+                }
+                 if (gameMusic.paused) {
+                    gameMusic.play().then(() => gameMusic.pause()).catch(()=>{});
+                }
+                document.removeEventListener('click', initialInteraction);
+                document.removeEventListener('touchstart', initialInteraction);
+                document.removeEventListener('keydown', initialInteraction);
+            };
+            document.addEventListener('click', initialInteraction);
+            document.addEventListener('touchstart', initialInteraction);
+            document.addEventListener('keydown', initialInteraction);
+            showToast('Game Boy Pro Edition Carregado!', 2500);
+            console.log("Initialization Complete. State: ", currentGameState);
+        }
+        window.addEventListener('load', init);
+        function createGameBoyDetails() { const speaker = document.querySelector('.gameboy-speaker'); speaker.innerHTML = ''; for (let i = 0; i < 18; i++) { const hole = document.createElement('div'); hole.className = 'speaker-hole'; speaker.appendChild(hole); } }
+    </script>
+</body>
+</html>
