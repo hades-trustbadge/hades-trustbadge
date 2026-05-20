@@ -1,33 +1,69 @@
-# Game Boy Pro Edition - Multi! 🎮
+# Game Boy Pro Edition - Multi!
 
-Este é um projeto de um emulador/console retro estilo Game Boy desenvolvido inteiramente em HTML5, CSS3 e JavaScript. O projeto foi criado para ser leve, responsivo e acessível, permitindo que qualquer pessoa jogue diretamente no navegador.
+Experimente uma coleção de jogos clássicos em um emululador de Game Boy feito 100% em JavaScript/HTML/CSS. Perfeito para dispositivos móveis e desktop!
 
-## 🚀 Funcionalidades
+![gameboy-pro-edition-preview](https://user-images.githubusercontent.com/000000/gameboy-preview.gif)
 
-- **Múltiplos Jogos:** Seleção de jogos clássicos integrados.
-- **Design Responsivo:** Funciona em dispositivos móveis e desktop.
-- **Acessibilidade:** Inclui modo de alto contraste e suporte a navegação por teclado.
-- **Visual Retrô:** Estética baseada no clássico Game Boy com renderização pixelada.
+## 🎮 Jogos disponíveis
+- **Tetris**
+- **Snake**
+- **Platformer** (Mario-like)
+- **Breakout**
 
-## 🛠️ Tecnologias Utilizadas
-
-- HTML5 (Canvas)
-- CSS3 (Variáveis, Flexbox, Grid)
-- JavaScript (Vanilla)
-
-## 🤝 Como Contribuir
-
-Contribuições são muito bem-vindas! Se você tem uma ideia para um novo jogo, encontrou um bug ou quer melhorar a interface, sinta-se à vontade para:
-
-1. Fazer um **Fork** do projeto.
-2. Criar uma **Branch** para sua modificação (`git checkout -b feature/nova-funcionalidade`).
-3. Fazer o **Commit** das suas alterações (`git commit -m 'Adiciona nova funcionalidade'`).
-4. Fazer o **Push** para a Branch (`git push origin feature/nova-funcionalidade`).
-5. Abrir um **Pull Request**.
-
-## 📝 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+Basta abrir o site, escolher pelo menu e começar a jogar!
 
 ---
-*Ajude-nos a melhorar este projeto! Feedbacks e sugestões são sempre bem-vindos.*
+
+## 🚀 Como rodar localmente
+1. Clone o repositório ou faça download dos arquivos.
+2. Abra o arquivo `index.html` em seu navegador preferido.
+3. (Opcional) Ative o GitHub Pages para jogar online (ver instruções abaixo).
+
+---
+
+## 🕹️ Controles (Teclado)
+- **Setas/AWSD**: Direção
+- **Z / Espaço**: Botão A
+- **X / L**: Botão B
+- **Enter**: Start
+- **Shift**: Select
+- **C**: Alternar contraste
+- **T**: Alternar tamanho do texto
+- **V**: Alternar visualização Game Boy/canvas
+- **P**: Pausar/Retomar (nos jogos)
+
+(Em celular, basta usar os botões touch na tela — todos são acessíveis!)
+
+---
+
+## 🎨 Acessibilidade
+- **Alto contraste**: Botão Aa/tecla C
+- **Letra grande**: Botão A+/tecla T
+- **Totalmente navegável por teclado e tela touch**
+
+---
+
+## 🎵 Áudio/Música
+- **Todas as trilhas e efeitos disponíveis, mesmo no mobile**!
+- Se quiser rodar offline, lembre-se de baixar também os arquivos de música.
+
+---
+
+## 🌐 Publicando com GitHub Pages
+
+1. Vá em *Settings > Pages* no repositório.
+2. Selecione o branch principal (`main` ou `refactor/modular-js`).
+3. Folder = `/ (root)` se seu index.html está na raiz.
+4. Pronto! Seu projeto estará online em:
+   `https://hades-trustbadge.github.io/hades-trustbadge/`
+
+---
+
+## 🤝 Contribua!
+Pull requests, sugestões e feedbacks são super bem-vindos. Este projeto é para aprender, brincar e relembrar clássicos — qualquer melhoria é aceita!
+
+**Divirta-se!**
+
+---
+
+> Feito com amor, pixel art e nostalgia.
