@@ -1,3 +1,28 @@
+# Modules, dependencies, and builds
 node_modules/
-.env
 .DS_Store
+Thumbs.db
+
+# IDE and system configurations
+.vscode/
+.idea/
+*.iml
+
+# System temp files
+*.tmp
+*.swp
+
+# Build and dist folders
+build/
+dist/
+
+# npm/yarn lock files
+package-lock.json
+yarn.lock
+
+# OS-specific files
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs and caches
+*.log
